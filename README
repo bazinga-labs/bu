@@ -1,0 +1,103 @@
+Bash Utility (bu) Framework
+===========================
+
+This document describes the Bash Utility (bu) framework, a system for managing and using collections of bash functions.
+
+Core Concepts
+-------------
+The `bu` framework relies on `util_bash.sh`, which provides the core functionality for loading, unloading, and listing bash utilities and their functions.
+
+Environment Variables
+---------------------
+-   `BASH_UTILS_SRC`: This environment variable **must** be set to the directory path where your `util_*.sh` files are stored. The framework uses this path to find and load utility scripts.
+-   `BASH_UTILS_LOADED`: This environment variable is managed by the framework to keep track of currently loaded utilities. It's a colon-separated list of utility names.
+
+Helper Functions for Output
+---------------------------
+The framework provides standardized functions for script output:
+-   `info "message"`: Prints an informational message in blue.
+-   `warn "message"`: Prints a warning message in orange to stderr.
+-   `err "message"`: Prints an error message in red to stderr.
+
+Managing Utilities
+------------------
+The `util_bash.sh` script provides several functions to manage your bash utilities. These functions are typically available once `util_bash.sh` is sourced.
+
+-   `bu_load <util_name>`: Loads a specified utility. For example, `bu_load git` would load `util_git.sh`.
+-   `bu_unload <util_name>`: Unloads a specified utility and removes its functions from the current shell session.
+-   `bu_list [search_term]`: Lists all available utility files found in `$BASH_UTILS_SRC`. Optionally filters by a search term.
+-   `bu_list_loaded [search_term]`: Lists all currently loaded utilities. Optionally filters by a search term.
+-   `bu_functions [util_name]`: Displays functions available in loaded utilities. If `util_name` is provided, it shows functions only for that utility; otherwise, it shows functions for all loaded utilities.
+-   `bu_reload [util_name]`: Reloads a specific utility or all currently loaded utilities if no name is provided. This is useful for applying changes to utility files without restarting the shell session.
+
+Creating a New Bash Utility File
+--------------------------------
+Follow these guidelines to create a new utility file compatible with the `bu` framework:
+
+1.  **Naming Convention**: Name your utility file `util_<name>.sh` (e.g., `util_git.sh`, `util_path.sh`).
+2.  **Initial Check**: The first line of your script (after the shebang `#!/bin/bash`) must check if `util_bash.sh` is loaded:
+    ```bash
+    [[ -z "${BASH_UTILS_LOADED}" ]] && { echo "ERROR: util_bash.sh is not loaded. Please source it before using this script."; exit 1; }
+    ```
+3.  **Function Definition**: Define functions using the standard bash syntax. Include a comment immediately after the opening curly brace `{` to describe the function's purpose. This description is used by `list_bash_functions_in_file` and `bu_functions`.
+    ```bash
+    my_function() { # Description of what this function does
+      # Function implementation
+      if [ -z "$1" ]; then
+        info "Usage: my_function <parameter>"
+        return 1
+      fi
+      # ... rest of the function
+    }
+    ```
+4.  **Consistent Output**: Use the `err`, `warn`, and `info` functions for all script output to maintain consistency.
+5.  **Register Functions**: The last line of your utility file must call `list_bash_functions_in_file` to register its functions with the framework. This allows `bu_functions` to discover them.
+    ```bash
+    list_bash_functions_in_file "$(realpath "$0")"
+    ```
+    *(Note: The example in `util_bash.sh` shows `list_bash_functions_in_file >/dev/null 2>&1 && list_bash_functions_in_file "$(realpath "$0")" || err "alias is not loaded"`. The `>/dev/null 2>&1` part might be for suppressing output during initial load, and the `|| err "alias is not loaded"` seems to be a fallback. The core part is `list_bash_functions_in_file "$(realpath "$0")"`.)*
+
+Example Utility File Template:
+------------------------------
+```bash
+#!/bin/bash
+[[ -z "${BASH_UTILS_LOADED}" ]] && { echo "ERROR: util_bash.sh is not loaded. Please source it before using this script."; exit 1; }
+# -----------------------------------------------------------------------------
+# File: util_example.sh
+# Author: Your Name
+# Description: This is an example utility.
+# -----------------------------------------------------------------------------
+
+another_function() { # This is another example function
+  info "Another function was called with: $1"
+}
+
+# -----------------------------------------------------------------------------
+# Create aliases if needed
+# alias my_alias='my_function'
+# -----------------------------------------------------------------------------
+list_bash_functions_in_file "$(realpath "$0")"
+```
+
+Initial Setup
+-------------
+To use the `bu` framework:
+
+1.  Ensure `util_bash.sh` is present in your `BASH_UTILS_SRC` directory.
+2.  Set the `BASH_UTILS_SRC` environment variable in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`):
+    ```
+    export BASH_UTILS_SRC="/path/to/your/utils/bu" # Or wherever your 'bu' directory is
+    ```
+3.  Source `util_bash.sh` in your shell profile after setting `BASH_UTILS_SRC`:
+    ```bash
+    if [ -f "$BASH_UTILS_SRC/util_bash.sh" ]; then
+        source "$BASH_UTILS_SRC/util_bash.sh"
+        # Optionally load some default utilities here
+        # bu_load git
+        # bu_load pkgs
+    else
+        echo "Bash Utility framework (util_bash.sh) not found at $BASH_UTILS_SRC."
+    fi
+    ```
+
+This will make the `bu_*` commands and any auto-loaded utility functions available in your shell.
