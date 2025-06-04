@@ -1,11 +1,16 @@
 #!/bin/bash
-#-----------------------------------------------------------------------------
-# File: util_prjalias.sh
+# -----------------------------------------------------------------------------
+# File: bu/util_projectaliases.sh
 # Author: Bazinga Labs LLC
 # Email:  support@bazinga-labs.com
+# -----------------------------------------------------------------------------
 # Description: Utility functions for generating project aliases and loading project environments
-#-----------------------------------------------------------------------------
-[[ -z "${BASH_UTILS_LOADED}" ]] && { echo "ERROR: util_bash.sh is not loaded. Please source it before using this script."; exit 1; }
+# -----------------------------------------------------------------------------
+[[ -z "${BASH_UTILS_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
+  [[ -z "${BASH_UTILS_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
+  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
+  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
+}
 # -----------------------------------------------------------------------------
 change_prompt() { # Change the shell prompt to show project name
     #local current_dir=$(basename "$PWD")
@@ -40,14 +45,15 @@ go_project() { # Navigate to a project directory and set up its environment
   export PROJECT_WORKSPACE="$WORK/$project_name"
 
   cd "$PROJECT_WORKSPACE" || err "Failed to change directory to $PROJECT_WORKSPACE"
-  # Load the project environment
 
+
+  # Load the project environment
   [ -f "${project_name}.env" ] && source "${project_name}.env"
   [ -f venv/bin/activate ] && source venv/bin/activate
-  [ -n "$VIRTUAL_ENV" ] && bu_load pydev || warn "no python env set"
+  [ -n "$VIRTUAL_ENV" ] && util_load pydev || warn "no python env set"
   
   # Load bash utility required for code-development
-  [ -d .git ] && bu_load git
+  [ -d .git ] && util_load git
   if [[ "$TERM_PROGRAM" != "vscode" ]]; then
     [ -f "${project_name}".code-workspace ] && code "${project_name}".code-workspace
   fi
@@ -78,6 +84,6 @@ list_project_aliases() { # List all available project aliases
 # -----------------------------------------------------------------------------
 # Adding functions to autogenerate aliases
 gen_project_aliases
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 list_bash_functions_in_file >/dev/null 2>&1 && list_bash_functions_in_file "$(realpath "$0")" || err "alias is not loaded"
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------

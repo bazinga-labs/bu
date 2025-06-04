@@ -1,4 +1,8 @@
-# -----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+# Structure of a BASH utility file:
+# 1. Each utility file should be named util_<name>.sh
+# 2. First line must check if bu.sh is loaded
+#----------------------------------------------------------
 # File: bu/BU_GUIDE
 # Author: Bazinga Labs LLC
 # Email:  support@bazinga-labs.com
@@ -27,7 +31,12 @@ Example template for a new utility file:
 
 #-----------------------------------------------------------------------------
 #!/bin/bash
-[[ -z "${BASH_UTILS_LOADED}" ]] && { echo "ERROR: util_bash.sh is not loaded. Please source it before using this script."; exit 1; }
+# Ensure proper Bash Utilities environment
+[[ -z "${BASH_UTILS_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
+  [[ -z "${BASH_UTILS_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script." 
+  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
+  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
+}
 #-----------------------------------------------------------------------------
 my_function() { # Description of what this function does
   # Function implementation
@@ -50,7 +59,7 @@ alias my_alias='my_function'
 #-----------------------------------------------------------------------------
 list_bash_functions_in_file >/dev/null 2>&1 && list_bash_functions_in_file "$(realpath "$0")" || err "alias is not loaded"
 #-----------------------------------------------------------------------------
-
+ 
 Best practices:
 1. Include header with file name, author, and description
 2. Add horizontal lines (-------------) between functions for readability

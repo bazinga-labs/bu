@@ -1,14 +1,37 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
-# File: bu/util_pkgs.sh
+# File: bu/util_pydev.sh
 # Author: Bazinga Labs LLC
 # Email:  support@bazinga-labs.com
 # -----------------------------------------------------------------------------
-# Description: Utilities for managing python, hombrew, and pip env 
+# Description: Utilities for managing python, homebrew, and pip env
 # -----------------------------------------------------------------------------
-
-# Check if util_bash is loaded
-[[ -z "${BASH_UTILS_LOADED}" ]] && { echo "ERROR: util_bash.sh is not loaded. Please source it before using this script."; exit 1; }
+[[ -z "${BASH_UTILS_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
+  [[ -z "${BASH_UTILS_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
+  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
+  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
+}
+# -----------------------------------------------------------------------------
+# PYENV Setup
+# To use: brew install pyenv
+# Then, pyenv install <version>
+# And pyenv global <version> or pyenv local <version>
+pydev_init() {
+    if command -v pyenv &>/dev/null; then
+        export PYENV_ROOT="$HOME/.pyenv"
+        if [[ -d "$PYENV_ROOT/bin" ]]; then # Check if PYENV_ROOT/bin exists
+            export PATH="$PYENV_ROOT/bin:$PATH"
+        fi
+        # Ensure pyenv init is loaded for the correct shell (zsh in this case)
+        if [[ -n "$ZSH_VERSION" ]]; then
+            eval "$(pyenv init - zsh)"
+        elif [[ -n "$BASH_VERSION" ]]; then
+            eval "$(pyenv init - bash)"
+        fi
+    else
+        echo -e "${YELLOW}Warning: pyenv command not found. PYENV setup skipped.${RESET}" >&2
+    fi
+}
 # -----------------------------------------------------------------------------
 mypy() {   # Display Python environment information
     pyenv_version=$(pyenv --version 2>&1)
@@ -49,7 +72,6 @@ venv_init() { # Initialize and activate a Python virtual environment
         return 1
     fi
 }
-
 # -----------------------------------------------------------------------------
 pip_versions_report() { # Generate a report of installed pip packages and versions
     info "Package, Installed Version, Latest Version, Status" | column -t -s ','
@@ -66,7 +88,6 @@ pip_versions_report() { # Generate a report of installed pip packages and versio
         info "$package, $installed_version, $latest_version, $status"
     done <<< "$installed_packages" | column -t -s ','
 }
-
 # -----------------------------------------------------------------------------
 pip_diff_requirements() { # Compare temporary requirements file with requirements.txt using diff
     local req_file="requirements.txt"
@@ -82,7 +103,6 @@ pip_diff_requirements() { # Compare temporary requirements file with requirement
     info "Comparing '$temp_req_file' with '$req_file'..."
     code --diff "$temp_req_file" "$req_file"
 }
-
 # -----------------------------------------------------------------------------
 pip_overwrite_requirements_file() { # Overwrite requirements file with a backup
     local req_file="requirements.txt"
@@ -105,7 +125,6 @@ pip_clean_cache() { # Clear pip cache
     pip cache purge
     info "Pip cache cleared."
 }
-
 # -----------------------------------------------------------------------------
 brew_versions_report() { # Generate a report of installed Homebrew packages and versions
     if ! command -v jq &> /dev/null; then
@@ -128,15 +147,14 @@ brew_versions_report() { # Generate a report of installed Homebrew packages and 
         info "$package, $installed_version, $latest_version, $status"
     done <<< "$installed_versions" | column -t -s ','
 }
-
 # -----------------------------------------------------------------------------
 brew_clean_cache() { # Clear Homebrew cache
     brew cleanup -s
     info "Homebrew cache cleared."
 }
-alias clean-pycache='find . -type d -name "__pycache__" -exec rm -rf {} +'       # Clean Python cache directories
-alias clean-pip-cache='pip cache purge'  # Clear pip cache
-
+# -----------------------------------------------------------------------------
+alias clean-pycache='find . -type d -name "__pycache__" -exec rm -rf {} +'
+alias clean-pip-cache='pip cache purge'
 # -----------------------------------------------------------------------------
 # If loading is successful this will be executed
 # Always makes sure this is the last function call

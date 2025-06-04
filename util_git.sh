@@ -3,17 +3,14 @@
 # File: bu/util_git.sh
 # Author: Bazinga Labs LLC
 # Email:  support@bazinga-labs.com
-# ==============================================================================
-# DO NOT MODIFY THIS FILE WITHOUT PRIOR AUTHORIZATION
-#
-# This file is managed by Bazinga Labs LLC and changes may be overwritten.
-# Unauthorized edits may result in system malfunction or integration failure.
-# Contact support@bazinga-labs.com for changes or exceptions.
-# ==============================================================================
-# Description: Utilities for checking linux environment variables (PATH, LD_LIBRARY_PATH)
 # -----------------------------------------------------------------------------
-[[ -z "${BASH_UTILS_LOADED}" ]] && { echo "ERROR: util_bash.sh is not loaded. Please source it before using this script."; exit 1; }
-
+# Description: Utilities for git operations and file management
+# -----------------------------------------------------------------------------
+[[ -z "${BASH_UTILS_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
+  [[ -z "${BASH_UTILS_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
+  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
+  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
+}
 # -----------------------------------------------------------------------------
 git_is_repo() { # Checks if the current directory is within a git repository
     # Check if inside a git repository
@@ -35,10 +32,6 @@ git_is_repo() { # Checks if the current directory is within a git repository
         return 1
     fi
 }
-
-#==============================================================================
-# INFORMATION/STATUS FUNCTIONS
-#==============================================================================
 
 # -----------------------------------------------------------------------------
 git_file_info() { # Displays version information for a given file based on git history
@@ -151,10 +144,6 @@ git_find_modified() { # Find all files that differ from HEAD
         fi
     fi
 }
-
-#==============================================================================
-# FILE OPERATIONS FUNCTIONS
-#==============================================================================
 
 # -----------------------------------------------------------------------------
 git_checkout_head() {   # Replace local file with HEAD version from git
@@ -451,10 +440,6 @@ git_delete_file() { # Remove a file from git repository
     return 0
 }
 
-#==============================================================================
-# COMPARISON FUNCTIONS
-#==============================================================================
-
 # -----------------------------------------------------------------------------
 git_tkdiff_remote() { # Compares a local file to its counterpart on the remote origin
   if [ -z "$1" ]; then
@@ -519,10 +504,6 @@ git_tkdiff_remote() { # Compares a local file to its counterpart on the remote o
   
   return 0
 }
-
-#==============================================================================
-# STASH MANAGEMENT FUNCTIONS
-#==============================================================================
 
 # -----------------------------------------------------------------------------
 git_stash_named() { # Creates a new git stash with the provided name/message
