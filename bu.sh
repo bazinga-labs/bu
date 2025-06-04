@@ -14,21 +14,29 @@
 # -----------------------------------------------------------------------------
 # WARNING: This is the main utility file and should be loaded first.
 # -----------------------------------------------------------------------------
-
-if [ -z "$BASH_UTILS_SRC" ]; then
-    echo "Error: BASH_UTILS_SRC is not defined. This variable must point to the directory containing utility scripts."
-    return 1 2>/dev/null || exit 1
-fi
-
-# Export environment variable to track loaded utilities
-export BASH_UTILS_LOADED=""
+# Set BU to the parent directory of this script
+# Check if BU is already set
 # Color definitions for consistent output formatting
 export RED="\033[1;31m"
 export ORANGE="\033[1;33m"
 export BLUE="\033[1;34m"
 export GREEN="\033[1;32m"
 export RESET="\033[0m"
-
+if [ -n "${BU+x}" ]; then
+    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] Warning: BU is already set to '$BU'. It will be overwritten.${RESET}" >&2
+fi
+pushd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null || { echo "Error: Failed to change directory to script location"; return 1 2>/dev/null || exit 1; }
+export BU="$(pwd)"
+export BU_LOADED=""
+[ "$(dirs -p | wc -l)" -gt 1 ] && popd >/dev/null
+# Verify BU is not empty and directory exists
+if [ -z "$BU" ]; then
+    echo "Error: BU is not defined. Failed to determine directory from script location."
+    return 1 2>/dev/null || exit 1
+elif [ ! -d "$BU" ]; then
+    echo "Error: Directory '$BU' does not exist."
+    return 1 2>/dev/null || exit 1
+fi
 # -----------------------------------------------------------------------------
 # Helper functions for formatted output
 # -----------------------------------------------------------------------------
@@ -43,48 +51,8 @@ warn() {
 info() {
     echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
 }
-util_get_os() {   # Determine the operating system type
-    # Check for macOS
-    if [ "$(uname)" == "Darwin" ]; then
-        echo "MacOS"
-        return
-    fi
-    
-    # Check for Linux distributions with os-release file
-    if [ -f "/etc/os-release" ]; then
-        # Source the os-release file to get distribution info
-        . /etc/os-release
-        
-        # Check for specific distributions
-        case "${ID,,}" in
-            "rhel"|"redhat"|"centos")
-                echo "Redhat"
-                ;;
-            "rocky")
-                echo "RockyLinux"
-                ;;
-            "ubuntu")
-                echo "Ubuntu"
-                ;;
-            *)
-                echo "Linux-$ID"
-                ;;
-        esac
-        return
-    fi
-    
-    # Alternative checks for older systems without os-release
-    if [ -f "/etc/redhat-release" ]; then
-        echo "Redhat"
-        return
-    fi
-    
-    # Fallback to generic OS name
-    echo "$(uname -s)"
-}
-
 # -----------------------------------------------------------------------------
-util_util_name() { # Extracts utility name from full path
+bu_util_name() { # Extracts utility name from full path
     local full_path="$1"
     local base="$(basename "$full_path")"
     # Special case for main utility file
@@ -97,14 +65,14 @@ util_util_name() { # Extracts utility name from full path
     echo "$base"
 }
 # -----------------------------------------------------------------------------
-util_util_path() { # Constructs the full path for a given utility name
+bu_util_path() { # Constructs the full path for a given utility name
     local name="$1"
     # Special case for main utility
     if [ "$name" = "bu" ]; then
-        echo "$BASH_UTILS_SRC/bu.sh"
+        echo "$BU/bu.sh"
         return
     fi
-    echo "$BASH_UTILS_SRC/util_${name}.sh"
+    echo "$BU/util_${name}.sh"
 }
 # -----------------------------------------------------------------------------
 list_bash_functions_in_file() {   # List all function definitions in a file with descriptions
@@ -161,31 +129,31 @@ list_alias_in_file() {   # List all alias definitions in this file with descript
     done <<< "$as"
 }
 # -----------------------------------------------------------------------------
-util_list() {   # Display all available bash utilities
+# List commands (move to top)
+bu_list() {   # Display all available bash utilities
     info "All available BASH utilities:"
     # Find all utility files in BASH_UTILS_SRC
-    ls -1 "$BASH_UTILS_SRC"/util_*.sh 2>/dev/null | while read -r util_path; do
-        local util_name="$(util_util_name "$util_path")"
+    ls -1 "$BU"/util_*.sh 2>/dev/null | while read -r util_path; do
+        local util_name="$(bu_util_name "$util_path")"
         # Extract description from the utility file
         util_description="NA"; [ -f "$util_path" ] && desc=$(grep -m 1 "# Description:" "$util_path" | sed 's/# Description://' | xargs) && [ -n "$desc" ] && util_description="$desc"
         # Filter by search term if provided
         if [ -z "$1" ] || echo "$util_name" | grep -q "$1" || echo "$util_path" | grep -q "$1"; then
-            echo "$util_name : $util_description"
+            printf "  %-25s : %s\n" "$util_name" "$util_description"
         fi
     done
 }
 # -----------------------------------------------------------------------------
-util_list_loaded() {   # Display loaded bash utilities
-    info "Loaded BASH utilities:"
-    if [ -z "$BASH_UTILS_LOADED" ]; then
+bu_list_loaded() {   # Display loaded bash utilities
+    if [ -z "$BU_LOADED" ]; then
         err "No utilities currently loaded."
         return 1
     fi
-    
+    info "Loaded BASH utilities:"
     # Process each utility
-    echo "$BASH_UTILS_LOADED" | tr ":" "\n" | while read -r util_name; do
+    echo "$BU_LOADED" | tr ":" "\n" | while read -r util_name; do
         [ -z "$util_name" ] && continue  # Skip empty entries
-        util_path="$(util_util_path "$util_name")"
+        util_path="$(bu_util_path "$util_name")"
         
         # Check if utility file still exists
         if [ -f "$util_path" ]; then
@@ -202,9 +170,9 @@ util_list_loaded() {   # Display loaded bash utilities
     done
 }
 # -----------------------------------------------------------------------------
-util_load() {   # Load a specified bash utility
+bu_load() {   # Load a specified bash utility
     local util_name="$1"
-    local util_path="$(util_util_path "$util_name")"
+    local util_path="$(bu_util_path "$util_name")"
     
     # Check if utility name was provided
     if [ -z "$util_name" ]; then 
@@ -217,20 +185,22 @@ util_load() {   # Load a specified bash utility
         err "Utility '$util_name' not found at $util_path"
         return 1
     fi
-    
     # Source the utility file
     source "$util_path"
     # Check if sourcing was successful
     if [ $? -eq 0 ]; then
         # Append to the list of loaded utilities if not already in the list
-        if [[ "$BASH_UTILS_LOADED" != *"$util_name"* ]]; then
-            if [ -z "$BASH_UTILS_LOADED" ]; then
-                BASH_UTILS_LOADED="$util_name"
+        if [[ "$BU_LOADED" != *"$util_name"* ]]; then
+            if [ -z "$BU_LOADED" ]; then
+                BU_LOADED="$util_name"
             else
-                BASH_UTILS_LOADED="$BASH_UTILS_LOADED:$util_name"
+                BU_LOADED="$BU_LOADED:$util_name"
             fi
         fi
         info "Utility '$util_name' loaded successfully."
+        # Show functions loaded from this utility
+        list_bash_functions_in_file "$util_path"
+        list_alias_in_file "$util_path"
         return 0
     else
         err "Error loading utility '$util_name'."
@@ -238,9 +208,9 @@ util_load() {   # Load a specified bash utility
     fi
 }
 # -----------------------------------------------------------------------------
-util_unload() {   # Unload a specified bash utility and remove its functions
+bu_unload() {   # Unload a specified bash utility and remove its functions
     local util_name="$1"
-    local util_path="$(util_util_path "$util_name")"
+    local util_path="$(bu_util_path "$util_name")"
     
     # Check if utility name was provided
     if [ -z "$util_name" ]; then
@@ -249,7 +219,7 @@ util_unload() {   # Unload a specified bash utility and remove its functions
     fi
     
     # Check if the utility is currently loaded
-    if [[ "$BASH_UTILS_LOADED" != *"$util_name"* ]]; then
+    if [[ "$BU_LOADED" != *"$util_name"* ]]; then
         warn "Utility '$util_name' is not currently loaded."
         return 1
     fi
@@ -297,9 +267,9 @@ util_unload() {   # Unload a specified bash utility and remove its functions
         fi
     done <<< "$fs"
     
-    # Update the BASH_UTILS_LOADED variable to remove this utility
+    # Update the BU_LOADED variable to remove this utility
     local new_loaded=""
-    for loaded_util in $(echo "$BASH_UTILS_LOADED" | tr ":" " "); do
+    for loaded_util in $(echo "$BU_LOADED" | tr ":" " "); do
         if [ "$loaded_util" != "$util_name" ]; then
             if [ -z "$new_loaded" ]; then
                 new_loaded="$loaded_util"
@@ -309,31 +279,29 @@ util_unload() {   # Unload a specified bash utility and remove its functions
         fi
     done
     # Set the updated list of loaded utilities
-    BASH_UTILS_LOADED="$new_loaded"
+    BU_LOADED="$new_loaded"
     info "Utility '$util_name' unloaded successfully."
     return 0
 }
 # -----------------------------------------------------------------------------
-util_functions() {   # Show functions available in loaded bash utilities
+bu_functions() {   # Show functions available in loaded bash utilities
     local util_name="$1"
     
     # If no utilities are loaded, inform user and exit
-    if [ -z "$BASH_UTILS_LOADED" ]; then
-        warn "No utilities currently loaded."
-        return 0
-    fi
-    
+    [ -z "$BU_LOADED" ] && err "No utilities currently loaded."
+
     # If utility name is provided, check if it's loaded and show its functions
     if [ -n "$util_name" ]; then
-        if [[ "$BASH_UTILS_LOADED" != *"$util_name"* ]]; then
+        if [[ "$BU_LOADED" != *"$util_name"* ]]; then
             warn "Utility '$util_name' is not currently loaded."
-            warn "Use util_load '$util_name' to load it first."
+            warn "Use bu load '$util_name' to load it first."
             return 1
         fi
         
-        local util_path="$(util_util_path "$util_name")"
+        local util_path="$(bu_util_path "$util_name")"
         if [ -f "$util_path" ]; then
             list_bash_functions_in_file "$util_path"
+            list_alias_in_file "$util_path"
         else
             err "Utility file for '$util_name' not found at $util_path"
             return 1
@@ -342,26 +310,27 @@ util_functions() {   # Show functions available in loaded bash utilities
     fi
     
     # If no specific utility name is provided, show functions for all loaded utilities
-    info "Functions available in loaded utilities:"
-    echo "$BASH_UTILS_LOADED" | tr ":" "\n" | while read -r util; do
+    info "Functions and aliases available in loaded utilities:"
+    echo "$BU_LOADED" | tr ":" "\n" | while read -r util; do
         [ -z "$util" ] && continue  # Skip empty entries
-        util_path="$(util_util_path "$util")"
+        util_path="$(bu_util_path "$util")"
         
         if [ -f "$util_path" ]; then
             list_bash_functions_in_file "$util_path"
+            list_alias_in_file "$util_path"
         else
-            err "Functions for utility '$util' cannot be shown (file missing)"
+            err "Functions and aliases for utility '$util' cannot be shown (file missing)"
         fi
     done
 }
 # -----------------------------------------------------------------------------
-util_reload() {   # Reload a specified bash utility (unload and load again) or all if none specified
+bu_reload() {   # Reload a specified bash utility (unload and load again) or all if none specified
     local util_name="$1"
     
     # If no utility name was provided, reload all loaded utilities
     if [ -z "$util_name" ]; then
         # Check if any utilities are loaded
-        if [ -z "$BASH_UTILS_LOADED" ]; then
+        if [ -z "$BU_LOADED" ]; then
             warn "No utilities currently loaded."
             return 0
         fi
@@ -372,7 +341,7 @@ util_reload() {   # Reload a specified bash utility (unload and load again) or a
         local failed_count=0
         
         # Create a temporary copy of the loaded utilities list
-        local utils_to_reload=$(echo "$BASH_UTILS_LOADED" | tr ":" " ")
+        local utils_to_reload=$(echo "$BU_LOADED" | tr ":" " ")
         
         for util in $utils_to_reload; do
             [ -z "$util" ] && continue  # Skip empty entries
@@ -380,7 +349,7 @@ util_reload() {   # Reload a specified bash utility (unload and load again) or a
             info "Reloading utility '$util'..."
             
             # Unload the utility
-            util_unload "$util"
+            bu_unload "$util"
             local unload_status=$?
             
             if [ $unload_status -ne 0 ]; then
@@ -391,7 +360,7 @@ util_reload() {   # Reload a specified bash utility (unload and load again) or a
             fi
             
             # Load the utility again
-            util_load "$util"
+            bu_load "$util"
             local load_status=$?
             
             if [ $load_status -eq 0 ]; then
@@ -411,16 +380,16 @@ util_reload() {   # Reload a specified bash utility (unload and load again) or a
     
     # Otherwise reload a specific utility (existing functionality)
     # Check if the utility is currently loaded
-    if [[ "$BASH_UTILS_LOADED" != *"$util_name"* ]]; then
+    if [[ "$BU_LOADED" != *"$util_name"* ]]; then
         warn "Utility '$util_name' is not currently loaded. Will attempt to load it."
-        util_load "$util_name"
+        bu_load "$util_name"
         return $?
     fi
     
     info "Reloading utility '$util_name'..."
     
     # Unload the utility first
-    util_unload "$util_name"
+    bu_unload "$util_name"
     local unload_status=$?
     
     if [ $unload_status -ne 0 ]; then
@@ -429,7 +398,7 @@ util_reload() {   # Reload a specified bash utility (unload and load again) or a
     fi
     
     # Then load it again
-    util_load "$util_name"
+    bu_load "$util_name"
     local load_status=$?
     
     if [ $load_status -eq 0 ]; then
@@ -441,9 +410,47 @@ util_reload() {   # Reload a specified bash utility (unload and load again) or a
     fi
 }
 # -----------------------------------------------------------------------------
-info "BashUtils loaded from $(realpath "$BASH_UTILS_SRC")"; 
-if [ "$(basename "$(realpath "$0")")" = "bu.sh" ]; then
-    BASH_UTILS_LOADED="$BASH_UTILS_LOADED:bu"
-else
-    BASH_UTILS_LOADED="$BASH_UTILS_LOADED:$(util_util_name "$(realpath "$0")")"
-fi
+# bu command handler at the bottom
+bu() {   # Handle bu command-line interface
+    local cmd="$1"
+    shift || true  # Shift to get remaining args, continue if no args
+
+    case "$cmd" in
+        "list")
+            bu_list "$@"
+            ;;
+        "loaded"|"ls")
+            bu_list_loaded "$@"
+            ;;
+        "load")
+            bu_load "$@"
+            ;;
+        "unload")
+            bu_unload "$@"
+            ;;
+        "functions"|"funcs"|"fn")
+            bu_functions "$@"
+            ;;
+        "reload")
+            bu_reload "$@"
+            ;;
+        "help"|"--help"|"-h"|"")
+            echo "Usage: bu <command> [args]"
+            echo "Commands:"
+            printf "  %-25s : %s\n" "list" "List all available utilities"
+            printf "  %-25s : %s\n" "loaded, ls" "List loaded utilities"
+            printf "  %-25s : %s\n" "load <name>" "Load a utility"
+            printf "  %-25s : %s\n" "unload <name>" "Unload a utility"
+            printf "  %-25s : %s\n" "functions, funcs [name]" "Show functions in loaded utilities"
+            printf "  %-25s : %s\n" "reload [name]" "Reload a utility or all utilities"
+            printf "  %-25s : %s\n" "help" "Show this help message"
+            ;;
+        *)
+            err "Unknown command: $cmd"
+            err "Use 'bu help' to see available commands"
+            return 1
+            ;;
+    esac
+}
+info "BU is loaded from \"$BU/bu.sh\""
+

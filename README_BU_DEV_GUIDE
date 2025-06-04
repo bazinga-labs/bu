@@ -17,26 +17,18 @@
 -----------------------------------------------------------------------------
 BASH UTILITY CREATION GUIDE
 -----------------------------------------------------------------------------
-This section documents how to create a bash utility file that works with this framework.
------------------------------------------------------------------------------
 
 Structure of a BASH utility file:
 1. Each utility file should be named util_<name>.sh
 2. First line must check if util_bash.sh is loaded
 3. Each function should follow the format: function_name() { Description
 4. Use err, warn, and info functions for consistent output
-5. Last line must call list_bash_functions_in_file to register functions
 
 Example template for a new utility file:
 
 #-----------------------------------------------------------------------------
 #!/bin/bash
 # Ensure proper Bash Utilities environment
-[[ -z "${BASH_UTILS_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
-  [[ -z "${BASH_UTILS_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script." 
-  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
-  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
-}
 #-----------------------------------------------------------------------------
 my_function() { # Description of what this function does
   # Function implementation
@@ -56,8 +48,6 @@ my_function() { # Description of what this function does
 #-----------------------------------------------------------------------------
 # Create aliases if needed
 alias my_alias='my_function'
-#-----------------------------------------------------------------------------
-list_bash_functions_in_file >/dev/null 2>&1 && list_bash_functions_in_file "$(realpath "$0")" || err "alias is not loaded"
 #-----------------------------------------------------------------------------
  
 Best practices:

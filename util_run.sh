@@ -6,8 +6,8 @@
 # -----------------------------------------------------------------------------
 # Description: Functions for running scripts, tests, and commands with output capture
 # -----------------------------------------------------------------------------
-[[ -z "${BASH_UTILS_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
-  [[ -z "${BASH_UTILS_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
+[[ -z "${BU_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
+  [[ -z "${BU_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
   [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
   [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
 }
@@ -120,6 +120,4 @@ run_makefile() { # Run make commands with Makefile and save output to make.out
     fi
     return $exit_status
 }
-# -----------------------------------------------------------------------------
-list_bash_functions_in_file >/dev/null 2>&1 && list_bash_functions_in_file "$(realpath "$0")" || err "alias is not loaded"
 # -----------------------------------------------------------------------------

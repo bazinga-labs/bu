@@ -6,8 +6,8 @@
 # -----------------------------------------------------------------------------
 # Description: Utility functions for generating project aliases and loading project environments
 # -----------------------------------------------------------------------------
-[[ -z "${BASH_UTILS_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
-  [[ -z "${BASH_UTILS_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
+[[ -z "${BU_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
+  [[ -z "${BU_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
   [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
   [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
 }
@@ -84,6 +84,4 @@ list_project_aliases() { # List all available project aliases
 # -----------------------------------------------------------------------------
 # Adding functions to autogenerate aliases
 gen_project_aliases
-# -----------------------------------------------------------------------------
-list_bash_functions_in_file >/dev/null 2>&1 && list_bash_functions_in_file "$(realpath "$0")" || err "alias is not loaded"
 # -----------------------------------------------------------------------------
