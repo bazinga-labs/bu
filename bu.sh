@@ -3,13 +3,61 @@
 # File: bu/bu.sh
 # Author: Bazinga Labs LLC
 # Email:  support@bazinga-labs.com
-# ==============================================================================
-# DO NOT MODIFY THIS FILE WITHOUT PRIOR AUTHORIZATION
+# -----------------------------------------------------------------------------
+# Description:
+#   Main Bash Utilities loader and manager. Provides a framework for loading,
+#   unloading, listing, and managing modular bash utility scripts and project-specific
+#   aliases. Ensures consistent output formatting, error handling, and utility
+#   discoverability. Supports utilities in both the main directory and a user alias
+#   directory ($BU_PROJECT_ALIAS).
 #
+#   Key Features:
+#     - Color-coded info, warning, and error output
+#     - Dynamic loading/unloading of utility scripts
+#     - Support for project-specific aliases
+#     - Utility listing, function/alias introspection, and reload support
+#     - Robust error handling and environment validation
+#
+#   Usage:
+#     Source this file in your shell or scripts to enable the 'bu' command and
+#     related utility management functions.
+#
+#   Environment Variables:
+#     BU                : Main utilities directory (auto-detected)
+#     BU_PROJECT_ALIAS  : Directory for project alias scripts (default: ~/.my_projects_aliases)
+#     BU_LOADED         : Colon-separated list of loaded utilities
+#
+#   Main Function:
+#     bu                : Command-line handler for all utility management operations
+#       - list          : List all available utilities and aliases
+#         Example: bu list
+#       - loaded, ls    : List currently loaded utilities
+#         Example: bu loaded
+#       - load <name>   : Load a utility or alias
+#         Example: bu load dev_py
+#       - loadall       : Load all available utilities and aliases
+#         Example: bu loadall
+#       - unload <name> : Unload a utility
+#         Example: bu unload git
+#       - functions, funcs [name] : Show functions/aliases in loaded utilities
+#         Example: bu functions dev_sw
+#       - reload [name] : Reload a utility or all loaded utilities
+#         Example: bu reload p4
+#         Example: bu reload
+#       - help          : Show help message
+#         Example: bu help
+#
+#   Helper Functions:
+#     err, warn, info   : Consistent color-coded output
+#     bu_util_name      : Extract utility name from file path
+#     bu_util_path      : Resolve utility/alias file path
+#     list_bash_functions_in_file, list_alias_in_file : Introspection helpers
+# -----------------------------------------------------------------------------
+# DO NOT MODIFY THIS FILE WITHOUT PRIOR AUTHORIZATION
 # This file is managed by Bazinga Labs LLC and changes may be overwritten.
 # Unauthorized edits may result in system malfunction or integration failure.
 # Contact support@bazinga-labs.com for changes or exceptions.
-# ==============================================================================
+# -----------------------------------------------------------------------------
 # Description: Utilities for checking linux environment variables (PATH, LD_LIBRARY_PATH)
 # -----------------------------------------------------------------------------
 # WARNING: This is the main utility file and should be loaded first.
@@ -26,7 +74,7 @@ if [ -n "${BU+x}" ]; then
     echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] Warning: BU is already set to '$BU'. It will be overwritten.${RESET}" >&2
 fi
 pushd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null || { echo "Error: Failed to change directory to script location"; return 1 2>/dev/null || exit 1; }
-export BU="$(pwd)"
+[ -z "${BU+x}" ] && export BU="$(pwd)"
 export BU_LOADED=""
 [ "$(dirs -p | wc -l)" -gt 1 ] && popd >/dev/null
 # Verify BU is not empty and directory exists
@@ -37,6 +85,9 @@ elif [ ! -d "$BU" ]; then
     echo "Error: Directory '$BU' does not exist."
     return 1 2>/dev/null || exit 1
 fi
+# Set BU_PROJECT_ALIAS to the user's aliases directory, or use existing value
+export BU_PROJECT_ALIAS="${BU_PROJECT_ALIAS:-$HOME/.my_projects_aliases}"
+[ ! -d "$BU_PROJECT_ALIAS" ] && mkdir -p "$BU_PROJECT_ALIAS" >/dev/null 2>&1
 # -----------------------------------------------------------------------------
 # Helper functions for formatted output
 # -----------------------------------------------------------------------------
@@ -55,11 +106,6 @@ info() {
 bu_util_name() { # Extracts utility name from full path
     local full_path="$1"
     local base="$(basename "$full_path")"
-    # Special case for main utility file
-    if [ "$base" = "bu.sh" ]; then
-        echo "bu"
-        return
-    fi
     base="${base#util_}"
     base="${base%.sh}"
     echo "$base"
@@ -72,6 +118,17 @@ bu_util_path() { # Constructs the full path for a given utility name
         echo "$BU/bu.sh"
         return
     fi
+    # Check for standard util_<name>.sh in $BU
+    if [ -f "$BU/util_${name}.sh" ]; then
+        echo "$BU/util_${name}.sh"
+        return
+    fi
+    # Check for <name>.alias in $BU_PROJECT_ALIAS
+    if [ -f "$BU_PROJECT_ALIAS/${name}.alias" ]; then
+        echo "$BU_PROJECT_ALIAS/${name}.alias"
+        return
+    fi
+    # Default to $BU/util_<name>.sh for error reporting
     echo "$BU/util_${name}.sh"
 }
 # -----------------------------------------------------------------------------
@@ -132,14 +189,27 @@ list_alias_in_file() {   # List all alias definitions in this file with descript
 # List commands (move to top)
 bu_list() {   # Display all available bash utilities
     info "All available BASH utilities:"
-    # Find all utility files in BASH_UTILS_SRC
-    ls -1 "$BU"/util_*.sh 2>/dev/null | while read -r util_path; do
+    local seen_utils=""
+    # List from $BU (util_*.sh)
+    for util_path in "$BU"/util_*.sh; do
+        [ ! -f "$util_path" ] && continue
         local util_name="$(bu_util_name "$util_path")"
-        # Extract description from the utility file
+        if echo ":$seen_utils:" | grep -q ":$util_name:"; then continue; fi
+        seen_utils="$seen_utils:$util_name"
         util_description="NA"; [ -f "$util_path" ] && desc=$(grep -m 1 "# Description:" "$util_path" | sed 's/# Description://' | xargs) && [ -n "$desc" ] && util_description="$desc"
-        # Filter by search term if provided
         if [ -z "$1" ] || echo "$util_name" | grep -q "$1" || echo "$util_path" | grep -q "$1"; then
             printf "  %-25s : %s\n" "$util_name" "$util_description"
+        fi
+    done
+    # List from $BU_PROJECT_ALIAS (<name>.alias)
+    for alias_path in "$BU_PROJECT_ALIAS"/*.alias; do
+        [ ! -f "$alias_path" ] && continue
+        local alias_name="$(basename "$alias_path" .alias)"
+        if echo ":$seen_utils:" | grep -q ":$alias_name:"; then continue; fi
+        seen_utils="$seen_utils:$alias_name"
+        alias_description="NA"; [ -f "$alias_path" ] && desc=$(grep -m 1 "# Description:" "$alias_path" | sed 's/# Description://' | xargs) && [ -n "$desc" ] && alias_description="$desc"
+        if [ -z "$1" ] || echo "$alias_name" | grep -q "$1" || echo "$alias_path" | grep -q "$1"; then
+            printf "  %-25s : %s\n" "$alias_name" "$alias_description"
         fi
     done
 }
@@ -206,6 +276,40 @@ bu_load() {   # Load a specified bash utility
         err "Error loading utility '$util_name'."
         return 1
     fi
+}
+# -----------------------------------------------------------------------------
+bu_load_all_utils() {   # Load all available bash utilities and aliases
+    local loaded_count=0
+    local failed_count=0
+    local seen_utils=""
+    # Load all util_*.sh from $BU
+    for util_path in "$BU"/util_*.sh; do
+        [ ! -f "$util_path" ] && continue
+        local util_name="$(bu_util_name "$util_path")"
+        if echo ":$seen_utils:" | grep -q ":$util_name:"; then continue; fi
+        seen_utils="$seen_utils:$util_name"
+        bu_load "$util_name"
+        if [ $? -eq 0 ]; then
+            loaded_count=$((loaded_count+1))
+        else
+            failed_count=$((failed_count+1))
+        fi
+    done
+    # Load all <name>.alias from $BU_PROJECT_ALIAS
+    for alias_path in "$BU_PROJECT_ALIAS"/*.alias; do
+        [ ! -f "$alias_path" ] && continue
+        local alias_name="$(basename "$alias_path" .alias)"
+        if echo ":$seen_utils:" | grep -q ":$alias_name:"; then continue; fi
+        seen_utils="$seen_utils:$alias_name"
+        bu_load "$alias_name"
+        if [ $? -eq 0 ]; then
+            loaded_count=$((loaded_count+1))
+        else
+            failed_count=$((failed_count+1))
+        fi
+    done
+    info "Loaded $loaded_count utilities/aliases. $failed_count failed."
+    [ $failed_count -eq 0 ] && return 0 || return 1
 }
 # -----------------------------------------------------------------------------
 bu_unload() {   # Unload a specified bash utility and remove its functions
@@ -425,6 +529,9 @@ bu() {   # Handle bu command-line interface
         "load")
             bu_load "$@"
             ;;
+        "loadall")
+            bu_load_all_utils
+            ;;
         "unload")
             bu_unload "$@"
             ;;
@@ -440,6 +547,7 @@ bu() {   # Handle bu command-line interface
             printf "  %-25s : %s\n" "list" "List all available utilities"
             printf "  %-25s : %s\n" "loaded, ls" "List loaded utilities"
             printf "  %-25s : %s\n" "load <name>" "Load a utility"
+            printf "  %-25s : %s\n" "loadall" "Load all available utilities and aliases"
             printf "  %-25s : %s\n" "unload <name>" "Unload a utility"
             printf "  %-25s : %s\n" "functions, funcs [name]" "Show functions in loaded utilities"
             printf "  %-25s : %s\n" "reload [name]" "Reload a utility or all utilities"
