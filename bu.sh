@@ -70,24 +70,6 @@ export ORANGE="\033[1;33m"
 export BLUE="\033[1;34m"
 export GREEN="\033[1;32m"
 export RESET="\033[0m"
-if [ -n "${BU+x}" ]; then
-    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] Warning: BU is already set to '$BU'. It will be overwritten.${RESET}" >&2
-fi
-pushd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null || { echo "Error: Failed to change directory to script location"; return 1 2>/dev/null || exit 1; }
-[ -z "${BU+x}" ] && export BU="$(pwd)"
-export BU_LOADED=""
-[ "$(dirs -p | wc -l)" -gt 1 ] && popd >/dev/null
-# Verify BU is not empty and directory exists
-if [ -z "$BU" ]; then
-    echo "Error: BU is not defined. Failed to determine directory from script location."
-    return 1 2>/dev/null || exit 1
-elif [ ! -d "$BU" ]; then
-    echo "Error: Directory '$BU' does not exist."
-    return 1 2>/dev/null || exit 1
-fi
-# Set BU_PROJECT_ALIAS to the user's aliases directory, or use existing value
-export BU_PROJECT_ALIAS="${BU_PROJECT_ALIAS:-$HOME/.my_projects_aliases}"
-[ ! -d "$BU_PROJECT_ALIAS" ] && mkdir -p "$BU_PROJECT_ALIAS" >/dev/null 2>&1
 # -----------------------------------------------------------------------------
 # Helper functions for formatted output
 # -----------------------------------------------------------------------------
@@ -102,6 +84,7 @@ warn() {
 info() {
     echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
 }
+
 # -----------------------------------------------------------------------------
 bu_util_name() { # Extracts utility name from full path
     local full_path="$1"
@@ -186,7 +169,6 @@ list_alias_in_file() {   # List all alias definitions in this file with descript
     done <<< "$as"
 }
 # -----------------------------------------------------------------------------
-# List commands (move to top)
 bu_list() {   # Display all available bash utilities
     info "All available BASH utilities:"
     local seen_utils=""
@@ -560,5 +542,25 @@ bu() {   # Handle bu command-line interface
             ;;
     esac
 }
-info "BU is loaded from \"$BU/bu.sh\""
+
+export BU_SH=$0
+export BU_LOADED=""
+# BU environment setup
+if printenv BU &>/dev/null; then
+    info "BU is already set to: $BU"
+    export BU
+else
+    info "BU is not set, setting based on $BU_SH"
+    export BU="$(dirname $0)"
+fi
+[ ! -d "$BU" ] && \
+    { err "BU directory does not exist: $BU"; 
+    [ -n "$ZSH_VERSION" ] && unexport BU || export -n BU; 
+    return 1; 
+}
+info "$BU_SH: BU environment initialized successfully \$BU=$BU"
+# Set BU_PROJECT_ALIAS to the user's aliases directory, or use existing value
+export BU_PROJECT_ALIAS="${BU_PROJECT_ALIAS:-$HOME/.my_projects_aliases}"
+[ ! -d "$BU_PROJECT_ALIAS" ] && mkdir -p "$BU_PROJECT_ALIAS" >/dev/null 2>&1
+
 

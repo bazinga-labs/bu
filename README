@@ -13,11 +13,15 @@ To use the `bu` framework:
 1. Add this line as the last line of your shell profile (e.g., `~/.bashrc`, `~/.zshrc`):
     ```
     ################################################################################
-    # Let this always be the last line
-    [[ -f "<path-to>/bu/bu.sh" ]] && source "$<path-to>/bu/bu.sh" || echo -e "\e[1;31mBashUtils not available\e[0m"
+    # Let this always be the last line in you ~/.zshrc or ~/.bashrc
+    source <path-to>/bu.sh 
     ################################################################################
     ```
-
+    if you want a custom BU PATH
+    ```
+    export BU="<path-A>"
+    source <path-to>/bu.sh
+    ```
 2. To load a utility, use:
 
     ```bash
