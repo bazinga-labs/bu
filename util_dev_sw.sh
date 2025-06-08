@@ -32,6 +32,43 @@ change_prompt() { # Change the shell prompt to show project name
     export PROMPT="($prompt_prefix) %~> "
     return 0
 }
+gen_vscode_workspace_file() { # Generate a VSCode workspace file for a project
+  local project_name="$1"
+  local workspace_file="${project_name}.code-workspace"
+  
+  if [ -z "$project_name" ]; then
+    err "No project name provided."
+    info "Usage: gen_vscode_workspace <project_name>"
+    return 1
+  fi
+  
+  if [ -f "$workspace_file" ]; then
+    info "VSCode workspace file already exists: $workspace_file"
+    return 0
+  fi
+  
+  info "Generating VSCode workspace file for $project_name"
+  
+  # Create a basic workspace file
+  cat > "$workspace_file" << EOF
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {}
+}
+EOF
+  
+  if [ $? -eq 0 ]; then
+    info "Created VSCode workspace file: $workspace_file"
+    return 0
+  else
+    err "Failed to create VSCode workspace file: $workspace_file"
+    return 1
+  fi
+}
 # -----------------------------------------------------------------------------
 go_project() { # Navigate to a project directory and set up its environment
   if [ -z "$1" ]; then
@@ -65,9 +102,13 @@ go_project() { # Navigate to a project directory and set up its environment
   [ -f "${project_name}.env" ] && source "${project_name}.env"
   [ -f venv/bin/activate ] && source venv/bin/activate
   [ -n "$VIRTUAL_ENV" ] && bu_load pydev || warn "no python env set"
-  
+  # Check if workspace file exists, create if it doesn't
+  if [ ! -f "${project_name}.code-workspace" ]; then
+    info "No workspace file found, generating one"
+    gen_vscode_workspace_file "$project_name"
+  fi
   # Load bash utility required for code-development
-  [ -d .git ] && util_load git
+  [ -d .git ] && bu_load git
   if [[ "$TERM_PROGRAM" != "vscode" ]]; then
     [ -f "${project_name}".code-workspace ] && code "${project_name}".code-workspace
   fi
