@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -----------------------------------------------------------------------------
 # File: bu/util_pydev.sh
 # Author: Bazinga Labs LLC

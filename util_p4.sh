@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -----------------------------------------------------------------------------
 # File: bu/util_p4.sh
 # Author: Bazinga Labs LLC

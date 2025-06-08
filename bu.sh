@@ -124,8 +124,8 @@ warn() {
 info() {
     echo -e "${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
 }
-info() {
-    echo -e "${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
+info_bold() {
+    echo -e "${BOLD_INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
 }
 
 # -----------------------------------------------------------------------------
