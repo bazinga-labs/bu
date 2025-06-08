@@ -64,7 +64,7 @@ go_project() { # Navigate to a project directory and set up its environment
   # Load the project environment
   [ -f "${project_name}.env" ] && source "${project_name}.env"
   [ -f venv/bin/activate ] && source venv/bin/activate
-  [ -n "$VIRTUAL_ENV" ] && util_load pydev || warn "no python env set"
+  [ -n "$VIRTUAL_ENV" ] && bu_load pydev || warn "no python env set"
   
   # Load bash utility required for code-development
   [ -d .git ] && util_load git
