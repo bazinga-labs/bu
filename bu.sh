@@ -65,24 +65,67 @@
 # Set BU to the parent directory of this script
 # Check if BU is already set
 # Color definitions for consistent output formatting
-export RED="\033[1;31m"
-export ORANGE="\033[1;33m"
-export BLUE="\033[1;34m"
-export GREEN="\033[1;32m"
+# Regular colors
+export BLACK="\033[0;30m"
+export RED="\033[0;31m"
+export GREEN="\033[0;32m"
+export YELLOW="\033[0;33m"
+export BLUE="\033[0;34m"
+export MAGENTA="\033[0;35m"
+export CYAN="\033[0;36m"
+export WHITE="\033[0;37m"
+
+# Bright (bold) colors
+export BBLACK="\033[1;30m"
+export BRED="\033[1;31m"
+export BGREEN="\033[1;32m"
+export BYELLOW="\033[1;33m"   # same as your ORANGE
+export BBLUE="\033[1;34m"
+export BMAGENTA="\033[1;35m"
+export BCYAN="\033[1;36m"
+export BWHITE="\033[1;37m"
+
+# Background colors
+export ON_BLACK="\033[40m"
+export ON_RED="\033[41m"
+export ON_GREEN="\033[42m"
+export ON_YELLOW="\033[43m"
+export ON_BLUE="\033[44m"
+export ON_MAGENTA="\033[45m"
+export ON_CYAN="\033[46m"
+export ON_WHITE="\033[47m"
+
+# Text styles
+export BOLD="\033[1m"
+export DIM="\033[2m"
+export UNDERLINE="\033[4m"
+export BLINK="\033[5m"
+export REVERSED="\033[7m"
+
+# Reset
 export RESET="\033[0m"
+
+export ERR_COLOR="${BRED}"
+export WARN_COLOR="${YELLOW}"
+export INFO_COLOR="${CYAN}"
+export BOLD_INFO_COLOR="B${INFO_COLOR}"
+
 # -----------------------------------------------------------------------------
 # Helper functions for formatted output
 # -----------------------------------------------------------------------------
 err() {
-    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] Error: $*${RESET}" >&2
+    echo -e "${ERR_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Error: $*${RESET}" >&2
 }
 
 warn() {
-    echo -e "${ORANGE}[$(date '+%Y-%m-%d %H:%M:%S')] Warning: $*${RESET}" >&2
+    echo -e "${WARN_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Warning: $*${RESET}" >&2
 }
 
 info() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
+    echo -e "${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
+}
+info() {
+    echo -e "${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
 }
 
 # -----------------------------------------------------------------------------
@@ -142,7 +185,7 @@ list_bash_functions_in_file() {   # List all function definitions in a file with
     while IFS= read -r line; do
         func_name=$(echo "$line" | sed -E 's/^([a-zA-Z0-9_]+)\(\).*$/\1/' | xargs)
         description=$(echo "$line" | sed 's/.*#//')
-        printf " %-${max_len}s :%s\n" "$func_name" "$description"
+        info "$(printf " %-${max_len}s :%s" "$func_name" "$description")"
     done <<< "$fs"
 }
 # -----------------------------------------------------------------------------
@@ -526,14 +569,14 @@ bu() {   # Handle bu command-line interface
         "help"|"--help"|"-h"|"")
             echo "Usage: bu <command> [args]"
             echo "Commands:"
-            printf "  %-25s : %s\n" "list" "List all available utilities"
-            printf "  %-25s : %s\n" "loaded, ls" "List loaded utilities"
-            printf "  %-25s : %s\n" "load <name>" "Load a utility"
-            printf "  %-25s : %s\n" "loadall" "Load all available utilities and aliases"
-            printf "  %-25s : %s\n" "unload <name>" "Unload a utility"
-            printf "  %-25s : %s\n" "functions, funcs [name]" "Show functions in loaded utilities"
-            printf "  %-25s : %s\n" "reload [name]" "Reload a utility or all utilities"
-            printf "  %-25s : %s\n" "help" "Show this help message"
+            info "  list                   : List all available utilities"
+            info "  loaded, ls             : List loaded utilities"
+            info "  load <name>            : Load a utility"
+            info "  loadall                : Load all available utilities and aliases"
+            info "  unload <name>          : Unload a utility"
+            info "  functions, funcs [name] : Show functions in loaded utilities"
+            info "  reload [name]          : Reload a utility or all utilities"
+            info "  help                   : Show this help message"
             ;;
         *)
             err "Unknown command: $cmd"

@@ -6,12 +6,6 @@
 # -----------------------------------------------------------------------------
 # Description: Utilities for managing python, homebrew, and pip env
 # -----------------------------------------------------------------------------
-[[ -z "${BU_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
-  [[ -z "${BU_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
-  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
-  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
-}
-# -----------------------------------------------------------------------------
 # PYENV Setup
 # To use: brew install pyenv
 # Then, pyenv install <version>

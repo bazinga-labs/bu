@@ -6,11 +6,25 @@
 # -----------------------------------------------------------------------------
 # Description: Utility functions for generating project aliases and loading project environments
 # -----------------------------------------------------------------------------
-[[ -z "${BU_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
-  [[ -z "${BU_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
-  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
-  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
+# Check if WORK environment variable is set
+check_work_var() {
+  if [ -z "$WORK" ]; then
+    err "WORK environment variable is not set."
+    info "Please set WORK variable to your projects directory: export WORK=/path/to/projects"
+    return 1
+  fi
+  
+  if [ ! -d "$WORK" ]; then
+    err "WORK directory does not exist: $WORK"
+    info "Please create the directory or set WORK to an existing directory"
+    return 1
+  fi
+  
+  info "WORK is set to $WORK"
+  return 0
 }
+
+# Run checks when this script is sourced
 # -----------------------------------------------------------------------------
 change_prompt() { # Change the shell prompt to show project name
     #local current_dir=$(basename "$PWD")
@@ -68,7 +82,7 @@ gen_project_aliases() { # Generate aliases for all projects in the WORK director
     [ -d "$dir" ] || continue
     local project_name=$(basename "$dir")
     alias "go-$project_name"="go_project $project_name"
-    #   info "  go-$project_name: $WORK/$project_name" # Optional: uncomment to list generated aliases
+    info "  go-$project_name: $WORK/$project_name" # Optional: uncomment to list generated aliases
   done
   return 0
 }
@@ -83,5 +97,6 @@ list_project_aliases() { # List all available project aliases
 }
 # -----------------------------------------------------------------------------
 # Adding functions to autogenerate aliases
+check_work_var || { err "Some functions may not work properly without WORK being set"; return 1; }
 gen_project_aliases
 # -----------------------------------------------------------------------------

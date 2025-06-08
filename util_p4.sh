@@ -6,11 +6,6 @@
 # -----------------------------------------------------------------------------
 # Description: This utility provides functions for Perforce operations and workarea management.
 # -----------------------------------------------------------------------------
-[[ -z "${BU_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
-  [[ -z "${BU_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
-  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
-  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
-}
 # -----------------------------------------------------------------------------
 p4_new_workspace() { # Create a new Perforce workspace (client) interactively
   # Parameters: None (uses interactive input)

@@ -6,11 +6,7 @@
 # -----------------------------------------------------------------------------
 # Description: Utilities for git operations and file management
 # -----------------------------------------------------------------------------
-[[ -z "${BU_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
-  [[ -z "${BU_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
-  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
-  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
-}
+
 # -----------------------------------------------------------------------------
 git_is_repo() { # Checks if the current directory is within a git repository
     # Check if inside a git repository

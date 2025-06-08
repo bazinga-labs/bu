@@ -6,12 +6,6 @@
 # -----------------------------------------------------------------------------
 # Description: Utilities for checking linux environment variables (PATH, LD_LIBRARY_PATH)
 # -----------------------------------------------------------------------------
-[[ -z "${BU_LOADED}" || "${BASH_SOURCE[0]}" == "${0}" ]] && {
-  [[ -z "${BU_LOADED}" ]] && echo "ERROR: bu.sh is not loaded. Please source it before using this script."
-  [[ "${BASH_SOURCE[0]}" == "${0}" ]] && echo "ERROR: This script must be sourced through Bash Utilities, not executed directly."
-  [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 1 || exit 1
-}
-# -----------------------------------------------------------------------------
 check_path() { # Display PATH entries and check for duplicates
     if [ -z "$1" ]; then
         info "All PATH entries:"
