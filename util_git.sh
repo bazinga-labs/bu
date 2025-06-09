@@ -518,3 +518,122 @@ git_stash_list() { # Lists all git stashes in the repository
 }
 
 # -----------------------------------------------------------------------------
+setup_ssh_git() { # Sets up SSH keys for GitHub authentication
+    local email=${1:-$(git config user.email 2>/dev/null)}
+    local key=${2:-id_ed25519}
+    local remote=${3:-origin}
+    local repo=${4:-git@github.com:bazinga-labs/customer-ethernovia.git}
+    [[ -z $email ]] && { info "Usage: setup_ssh_git your.email@example.com [key_name] [remote_name] [repo_ssh_url]"; return 1; }
+
+    info "Setting up SSH authentication for Git with email: $email"
+    mkdir -p ~/.ssh
+    [[ ! -f ~/.ssh/$key ]] && { 
+        info "Creating new SSH key: ~/.ssh/$key"
+        ssh-keygen -t ed25519 -C "$email" -f ~/.ssh/$key -N ""
+    } || info "Using existing SSH key: ~/.ssh/$key"
+    
+    info "Starting SSH agent and adding key"
+    eval "$(ssh-agent -s)" >/dev/null
+    ssh-add ~/.ssh/$key
+
+    info "=== Public key: upload to GitHub SSH keys ==="
+    cat ~/.ssh/$key.pub
+    info "============================================"
+    read -rp "Press Enter when done..." _
+
+    grep -q "Host github.com" ~/.ssh/config 2>/dev/null || {
+        info "Adding GitHub configuration to ~/.ssh/config"
+        printf "\nHost github.com\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/%s\n  AddKeysToAgent yes\n" "$key" >> ~/.ssh/config
+        chmod 600 ~/.ssh/config
+    }
+
+    if git rev-parse --is-inside-work-tree &>/dev/null; then
+        info "Setting remote URL to $repo"
+        git remote set-url "$remote" "$repo"
+        info "Testing SSH connection to GitHub"
+        ssh -T git@github.com || true
+        info "Pushing to remote repository"
+        git push -u "$remote" HEAD
+    else
+        warn "Not in a git repository. Remotes not set or pushed."
+    fi
+    
+    info "SSH setup for Git completed successfully."
+    return 0
+}
+# -----------------------------------------------------------------------------
+git_update() { # Updates the git working directory with latest changes from remote
+    local branch=${1:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}
+    local remote=${2:-origin}
+    local stash_changes=true
+    
+    # Process command-line options
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            -n|--no-stash) stash_changes=false ;;
+            --branch=*) branch="${1#*=}" ;;
+            --remote=*) remote="${1#*=}" ;;
+            *) break ;;
+        esac
+        shift
+    done
+    
+    # Check if we're in a git repository
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        err "Not in a git repository."
+        return 1
+    fi
+    
+    info "Updating git repository from remote: $remote/$branch"
+    
+    # Check for local changes
+    if ! git diff-index --quiet HEAD --; then
+        if [ "$stash_changes" = true ]; then
+            info "Local changes detected. Stashing changes..."
+            git stash save "Auto-stash before git_update on $(date)"
+            local stashed=true
+        else
+            warn "Local changes detected but --no-stash option was used."
+            warn "The update may fail if there are conflicts."
+        fi
+    fi
+    
+    # Fetch latest changes
+    info "Fetching latest changes..."
+    git fetch "$remote" || { err "Failed to fetch from remote."; return 1; }
+    
+    # Check if branch exists locally
+    if ! git show-ref --verify --quiet refs/heads/"$branch"; then
+        info "Branch $branch doesn't exist locally. Creating tracking branch..."
+        git checkout -b "$branch" "$remote/$branch" || { 
+            err "Failed to create tracking branch for $branch."; 
+            return 1; 
+        }
+    else
+        # Make sure we're on the right branch
+        git checkout "$branch" || { err "Failed to checkout branch $branch."; return 1; }
+        
+        # Pull changes
+        info "Pulling latest changes for $branch..."
+        git pull --ff-only "$remote" "$branch" || {
+            warn "Fast-forward pull failed. Trying rebase..."
+            git pull --rebase "$remote" "$branch" || {
+                err "Failed to update branch. Please resolve conflicts manually.";
+                return 1;
+            }
+        }
+    fi
+    
+    # Apply stashed changes if any
+    if [ "${stashed:-false}" = true ] && [ "$stash_changes" = true ]; then
+        info "Reapplying stashed changes..."
+        git stash pop || {
+            warn "Failed to reapply stashed changes automatically."
+            warn "Your changes are saved in the stash. Use 'git stash list' and 'git stash apply' to recover them."
+        }
+    fi
+    
+    info "Git repository updated successfully to latest $remote/$branch."
+    return 0
+}
+# -----------------------------------------------------------------------------
