@@ -109,9 +109,10 @@ go_project() { # Navigate to a project directory and set up its environment
   fi
   # Load bash utility required for code-development
   [ -d .git ] && bu_load git
-  if [[ "$TERM_PROGRAM" != "vscode" ]]; then
-    [ -f "${project_name}".code-workspace ] && code "${project_name}".code-workspace
-  fi
+  # Load editor utility
+  bu_load editiors
+  # Open workspace file if it exists
+  [ -f "${project_name}".code-workspace ] && smart_edit "${project_name}".code-workspace
   change_prompt
   info "Switched to project: $PROJECT_NAME at $PROJECT_WORKSPACE"
   return 0

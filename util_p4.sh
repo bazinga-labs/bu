@@ -18,9 +18,9 @@ p4_new_workspace() { # Create a new Perforce workspace (client) interactively
   fi
 
   # Grab default client spec, edit fields, and submit
-  p4 client -o "$client" | \\
-    sed -e "s/^Client: .*$/Client: $client/" \\
-        -e "s|^Root: .*|Root: $root|" | \\
+  p4 client -o "$client" | \
+    sed -e "s/^Client: .*$/Client: $client/" \
+        -e "s|^Root: .*|Root: $root|" | \
     p4 client -i
   
   if [[ $? -eq 0 ]]; then
@@ -41,9 +41,9 @@ p4_clone_workspace() { # Clone an existing workspace spec to a new one
   fi
   local src="$1" 
   local dst="$2"
-  p4 client -o "$src" | \\
-    sed -e "s/^Client: .*$/Client: $dst/" \\
-        -e "s|^Root: .*|Root: $PWD|" | \\
+  p4 client -o "$src" | \
+    sed -e "s/^Client: .*$/Client: $dst/" \
+        -e "s|^Root: .*|Root: $PWD|" | \
     p4 client -i
   
   if [[ $? -eq 0 ]]; then
@@ -169,8 +169,8 @@ p4_files_in_change() { # List files in a changelist
     info "Usage: p4_files_in_change <changelist_number>"
     return 1
   else
-    p4 describe -s "$1" \\
-      | sed -n '/Affected files/,/^$/p' \\
+    p4 describe -s "$1" \
+      | sed -n '/Affected files/,/^$/p' \
       | sed '1d;$d'
     return $? # Return status of p4/sed pipeline
   fi
@@ -201,7 +201,7 @@ p4_edit_client_spec() { # Edit the current client spec in $EDITOR
     return 1
   fi
   p4 client -o "$client" > "$tmpfile"
-  "${EDITOR:-vi}" "$tmpfile"
+  smart_edit "$tmpfile"
   p4 client -i < "$tmpfile"
   local status=$?
   rm -f "$tmpfile"

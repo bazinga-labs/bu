@@ -88,8 +88,8 @@ git_file_history() { # Outputs the git commit history for the specified file, fo
         }
         print $0;
     }' > /tmp/git-file-history.csv
-    # Open the CSV file with VS Code
-    code /tmp/git-file-history.csv
+    # Open the CSV file with smart_edit
+    smart_edit /tmp/git-file-history.csv
 }
 
 # -----------------------------------------------------------------------------

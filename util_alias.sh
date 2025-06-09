@@ -57,7 +57,7 @@ setup_markdown_editor_alias() {  # Check if Markdown Editor app exists in standa
 # -----------------------------------------------------------------------------
 setup_open_alias() {  # Sets up the 'open' command to behave differently based on terminal environment
     if [[ "$TERM_PROGRAM" == "vscode" ]]; then
-        alias open="code"
+        alias open="smart_edit"
     else
         unalias open &>/dev/null
     fi
