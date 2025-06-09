@@ -522,7 +522,7 @@ setup_ssh_git() { # Sets up SSH keys for GitHub authentication
     local email=${1:-$(git config user.email 2>/dev/null)}
     local key=${2:-id_ed25519}
     local remote=${3:-origin}
-    local repo=${4:-git@github.com:bazinga-labs/customer-ethernovia.git}
+    local repo=${4:-git@github.com:bazinga-labs/bu.git}
     [[ -z $email ]] && { info "Usage: setup_ssh_git your.email@example.com [key_name] [remote_name] [repo_ssh_url]"; return 1; }
 
     info "Setting up SSH authentication for Git with email: $email"

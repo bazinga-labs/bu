@@ -44,13 +44,15 @@ smart_edit() { # Open a file with appropriate editor based on terminal environme
     
     # Not in VS Code, use default editor in this order: $EDITOR, vim, nano, or vi
     local editor="${EDITOR:-}"
-    
+    # Check if the specified EDITOR exists on the system
+    if [ ! -z "$editor" ] && ! command -v "$editor" >/dev/null 2>&1; then
+        warn "Specified editor '$editor' not found on this system."
+        editor=""
+    fi
     if [ -z "$editor" ]; then
         # No EDITOR set, try to find a suitable one
         if command -v vim >/dev/null 2>&1; then
             editor="vim"
-        elif command -v nano >/dev/null 2>&1; then
-            editor="nano"
         elif command -v vi >/dev/null 2>&1; then
             editor="vi"
         else
@@ -63,26 +65,4 @@ smart_edit() { # Open a file with appropriate editor based on terminal environme
     $editor "$file"
     return $?
 }
-# -----------------------------------------------------------------------------
-open_code_workspace() { # Open a .code-workspace file in the appropriate editor
-    local workspace_file="$1"
-    
-    if [ -z "$workspace_file" ]; then
-        err "No workspace file specified."
-        info "Usage: open_code_workspace <workspace_file.code-workspace>"
-        return 1
-    fi
-    
-    if [ ! -f "$workspace_file" ]; then
-        err "Workspace file does not exist: $workspace_file"
-        return 1
-    fi
-    
-    # Use smart_edit to open the workspace file
-    smart_edit "$workspace_file"
-    return $?
-}
-# -----------------------------------------------------------------------------
-# Alias for convenience
-alias edit='smart_edit'
 # -----------------------------------------------------------------------------
