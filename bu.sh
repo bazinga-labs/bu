@@ -208,7 +208,7 @@ list_alias_in_file() {   # List all alias definitions in this file with descript
     while IFS= read -r line; do
         alias_name=$(echo "$line" | sed -E 's/^alias[[:space:]]+([^=]+)=.*$/\1/' | xargs)
         description=$(echo "$line" | sed 's/.*#//')
-        printf " %-${max_len}s :%s\n" "$alias_name" "$description"
+        info "$(printf " %-${max_len}s :%s" "$alias_name" "$description")"
     done <<< "$as"
 }
 # -----------------------------------------------------------------------------
@@ -292,10 +292,11 @@ bu_load() {   # Load a specified bash utility
                 BU_LOADED="$BU_LOADED:$util_name"
             fi
         fi
-        info "Utility '$util_name' loaded successfully."
-        # Show functions loaded from this utility
-        list_bash_functions_in_file "$util_path"
-        list_alias_in_file "$util_path"
+        if [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ]; then
+            info "Utility '$util_name' loaded successfully."
+            list_bash_functions_in_file "$util_path"
+            list_alias_in_file "$util_path"
+        fi
         return 0
     else
         err "Error loading utility '$util_name'."
@@ -307,6 +308,8 @@ bu_load_all_utils() {   # Load all available bash utilities and aliases
     local loaded_count=0
     local failed_count=0
     local seen_utils=""
+    # Set verbosity level for loading
+    export BU_VERBOSE_LEVEL=0
     # Load all util_*.sh from $BU
     for util_path in "$BU"/util_*.sh; do
         [ ! -f "$util_path" ] && continue
@@ -321,19 +324,22 @@ bu_load_all_utils() {   # Load all available bash utilities and aliases
         fi
     done
     # Load all <name>.alias from $BU_PROJECT_ALIAS
-    for alias_path in "$BU_PROJECT_ALIAS"/*.alias; do
-        [ ! -f "$alias_path" ] && continue
-        local alias_name="$(basename "$alias_path" .alias)"
-        if echo ":$seen_utils:" | grep -q ":$alias_name:"; then continue; fi
-        seen_utils="$seen_utils:$alias_name"
-        bu_load "$alias_name"
-        if [ $? -eq 0 ]; then
-            loaded_count=$((loaded_count+1))
-        else
-            failed_count=$((failed_count+1))
-        fi
-    done
+    if ls "$BU_PROJECT_ALIAS"/*.alias 1> /dev/null 2>&1; then
+        for alias_path in "$BU_PROJECT_ALIAS"/*.alias; do
+            [ ! -f "$alias_path" ] && continue
+            local alias_name="$(basename "$alias_path" .alias)"
+            if echo ":$seen_utils:" | grep -q ":$alias_name:"; then continue; fi
+            seen_utils="$seen_utils:$alias_name"
+            bu_load "$alias_name"
+            if [ $? -eq 0 ]; then
+                loaded_count=$((loaded_count+1))
+            else
+                failed_count=$((failed_count+1))
+            fi
+        done
+    fi
     info "Loaded $loaded_count utilities/aliases. $failed_count failed."
+    export BU_VERBOSE_LEVEL=1  # Reset verbosity level to default
     [ $failed_count -eq 0 ] && return 0 || return 1
 }
 # -----------------------------------------------------------------------------
@@ -596,8 +602,22 @@ bu() {   # Handle bu command-line interface
 }
 
 export BU_SH=$0
-export BU_LOADED=""
-export BU_RELEASE="stable" # Default to stable branch
+export_BU_VARS() {   # Export BU environment variables
+    export BU_LOADED=""
+    export BU_RELEASE="stable" # Default to stable branch
+    export BU_VERBOSE_LEVEL=1
+}
+
+rollback_BU_VARS() {   # Rollback BU environment variables to pre-export state
+    # Unset the variables that were exported by export_BU_VARS
+    unset BU_LOADED
+    unset BU_RELEASE
+    unset BU_VERBOSE_LEVEL
+    info "BU environment variables have been rolled back"
+}
+
+# Call the function to set variables
+export_BU_VARS
 
 # BU environment setup
 if printenv BU &>/dev/null; then

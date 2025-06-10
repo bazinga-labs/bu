@@ -6,6 +6,32 @@
 # -----------------------------------------------------------------------------
 # Description: File system operation aliases and functions
 # -----------------------------------------------------------------------------
+# Define our own realpath implementation
+bu_realpath() {
+    local file="$1"
+    if [ -d "$file" ]; then
+        # Directory - use pwd to get absolute path
+        (cd "$file" && pwd)
+    elif [ -f "$file" ]; then
+        # File - resolve directory and append filename
+        local dir=$(dirname "$file")
+        local base=$(basename "$file")
+        echo "$(cd "$dir" && pwd)/$base"
+    else
+        # File doesn't exist but we can still try to resolve its directory
+        local dir=$(dirname "$file")
+        if [ -d "$dir" ]; then
+            local base=$(basename "$file")
+            echo "$(cd "$dir" && pwd)/$base"
+        else
+            # Cannot resolve, return original path
+            echo "$file"
+        fi
+    fi
+}
+# Check if realpath exists, if not use our implementation
+command -v realpath &>/dev/null || alias realpath=bu_realpath
+
 alias lr='ls -lrt'               # List files in long format, sorted by modification time
 alias la='ls -a'                 # List all files including hidden files
 alias l1='ls -1'                 # List files in single column
@@ -14,7 +40,8 @@ alias unlock='chmod -R 755'      # Set standard permissions (755) on files/direc
 alias mkexe='chmod -R 755'       # Make files executable with permission 755
 alias clean-temp-files='rm -f *~ .*~ *.swp *.swo *.bak *.tmp *.orig *.rej'  # Remove backup and temporary files
 alias fname='realpath'           # Get the full real path of a file/directory
-alias up='cd ..'                 # Navigate up one directory
+alias dname='dirname "$(realpath "$@")"'  # Get the directory name of a file
+alias up='cd ..'                          # Navigate up one directory
 alias x='exit'                   # Exit the terminal
 alias c='clear'                  # Clear the terminal screen
 alias cls='clear'                # Clear the terminal screen
@@ -35,17 +62,12 @@ goto() { # Navigate to directory set in environment variable name
 # -----------------------------------------------------------------------------
 
 # Directory navigation shortcuts
-alias w='goto "WORK"'
+alias work='goto "WORK"'
 alias docs='goto "DOCS"'
 alias dl='goto "DL"'
 alias idl='goto "iDL"'
 alias idoc='goto "iDOCS"'
 
-# -----------------------------------------------------------------------------
-dname() { # Get the directory name of a file/directory
-    [ -z "$1" ] && { err "Usage: dname <path>"; return 1; } || dirname "$(realpath "$1")"
-}
-# -----------------------------------------------------------------------------
 
 setup_markdown_editor_alias() {  # Check if Markdown Editor app exists in standard locations
     if [[ -d "/Applications/Markdown Editor.app" ]] || [[ -d "$HOME/Applications/Markdown Editor.app" ]]; then
