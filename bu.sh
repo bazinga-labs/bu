@@ -109,6 +109,7 @@ export ERR_COLOR="${BRED}"
 export WARN_COLOR="${YELLOW}"
 export INFO_COLOR="${CYAN}"
 export BOLD_INFO_COLOR="B${INFO_COLOR}"
+export DEBUG_COLOR="${MAGENTA}"
 
 # -----------------------------------------------------------------------------
 # Helper functions for formatted output
@@ -124,9 +125,16 @@ warn() {
 info() {
     echo -e "${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
 }
+
+debug() {
+    [ "${BU_VERBOSE_LEVEL:-0}" -gt 1 ] \
+    && echo -e "${DEBUG_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Debug: $*${RESET}"
+}
+
 info_bold() {
     echo -e "${BOLD_INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
 }
+
 
 # -----------------------------------------------------------------------------
 bu_util_name() { # Extracts utility name from full path
@@ -147,11 +155,6 @@ bu_util_path() { # Constructs the full path for a given utility name
     # Check for standard util_<name>.sh in $BU
     if [ -f "$BU/util_${name}.sh" ]; then
         echo "$BU/util_${name}.sh"
-        return
-    fi
-    # Check for <name>.alias in $BU_PROJECT_ALIAS
-    if [ -f "$BU_PROJECT_ALIAS/${name}.alias" ]; then
-        echo "$BU_PROJECT_ALIAS/${name}.alias"
         return
     fi
     # Default to $BU/util_<name>.sh for error reporting
@@ -226,17 +229,6 @@ bu_list() {   # Display all available bash utilities
             printf "  %-25s : %s\n" "$util_name" "$util_description"
         fi
     done
-    # List from $BU_PROJECT_ALIAS (<name>.alias)
-    for alias_path in "$BU_PROJECT_ALIAS"/*.alias; do
-        [ ! -f "$alias_path" ] && continue
-        local alias_name="$(basename "$alias_path" .alias)"
-        if echo ":$seen_utils:" | grep -q ":$alias_name:"; then continue; fi
-        seen_utils="$seen_utils:$alias_name"
-        alias_description="NA"; [ -f "$alias_path" ] && desc=$(grep -m 1 "# Description:" "$alias_path" | sed 's/# Description://' | xargs) && [ -n "$desc" ] && alias_description="$desc"
-        if [ -z "$1" ] || echo "$alias_name" | grep -q "$1" || echo "$alias_path" | grep -q "$1"; then
-            printf "  %-25s : %s\n" "$alias_name" "$alias_description"
-        fi
-    done
 }
 # -----------------------------------------------------------------------------
 bu_list_loaded() {   # Display loaded bash utilities
@@ -304,11 +296,10 @@ bu_load() {   # Load a specified bash utility
     fi
 }
 # -----------------------------------------------------------------------------
-bu_load_all_utils() {   # Load all available bash utilities and aliases
+bu_load_all_utils() {   # Load all available bash utilities
     local loaded_count=0
     local failed_count=0
     local seen_utils=""
-    # Set verbosity level for loading
     export BU_VERBOSE_LEVEL=0
     # Load all util_*.sh from $BU
     for util_path in "$BU"/util_*.sh; do
@@ -323,22 +314,7 @@ bu_load_all_utils() {   # Load all available bash utilities and aliases
             failed_count=$((failed_count+1))
         fi
     done
-    # Load all <name>.alias from $BU_PROJECT_ALIAS
-    if ls "$BU_PROJECT_ALIAS"/*.alias 1> /dev/null 2>&1; then
-        for alias_path in "$BU_PROJECT_ALIAS"/*.alias; do
-            [ ! -f "$alias_path" ] && continue
-            local alias_name="$(basename "$alias_path" .alias)"
-            if echo ":$seen_utils:" | grep -q ":$alias_name:"; then continue; fi
-            seen_utils="$seen_utils:$alias_name"
-            bu_load "$alias_name"
-            if [ $? -eq 0 ]; then
-                loaded_count=$((loaded_count+1))
-            else
-                failed_count=$((failed_count+1))
-            fi
-        done
-    fi
-    info "Loaded $loaded_count utilities/aliases. $failed_count failed."
+    info "Loaded $loaded_count utilities. $failed_count failed."
     export BU_VERBOSE_LEVEL=1  # Reset verbosity level to default
     [ $failed_count -eq 0 ] && return 0 || return 1
 }
@@ -610,6 +586,8 @@ export_BU_VARS() {   # Export BU environment variables
 
 rollback_BU_VARS() {   # Rollback BU environment variables to pre-export state
     # Unset the variables that were exported by export_BU_VARS
+    unset BU
+    unset BU_SH
     unset BU_LOADED
     unset BU_RELEASE
     unset BU_VERBOSE_LEVEL
@@ -617,7 +595,6 @@ rollback_BU_VARS() {   # Rollback BU environment variables to pre-export state
 }
 
 # Call the function to set variables
-export_BU_VARS
 
 # BU environment setup
 if printenv BU &>/dev/null; then
@@ -632,9 +609,8 @@ fi
     [ -n "$ZSH_VERSION" ] && unexport BU || export -n BU; 
     return 1; 
 }
+export_BU_VARS
 info "$BU_SH: BU environment initialized successfully \$BU=$BU"
-# Set BU_PROJECT_ALIAS to the user's aliases directory, or use existing value
-export BU_PROJECT_ALIAS="${BU_PROJECT_ALIAS:-$HOME/.my_projects_aliases}"
-[ ! -d "$BU_PROJECT_ALIAS" ] && mkdir -p "$BU_PROJECT_ALIAS" >/dev/null 2>&1
+
 
 
