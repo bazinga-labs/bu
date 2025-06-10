@@ -10,7 +10,7 @@
 check_work_var() {
   if [ -z "$WORK" ]; then
     err "WORK environment variable is not set."
-    info "Please set WORK variable to your projects directory: export WORK=/path/to/projects"
+    info "Please set WORK variable to your projects directory: export WORK=/path/to/project-workareas"
     return 1
   fi
   
@@ -20,7 +20,7 @@ check_work_var() {
     return 1
   fi
   
-  info "WORK is set to $WORK"
+  info "WORK:$WORK "
   return 0
 }
 
@@ -119,12 +119,12 @@ go_project() { # Navigate to a project directory and set up its environment
 }
 # -----------------------------------------------------------------------------
 gen_project_aliases() { # Generate aliases for all projects in the WORK directory
-  info "Generating project aliases"
+   [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ] && info "Generating project aliases"
   for dir in "$WORK"/*/; do
     [ -d "$dir" ] || continue
     local project_name=$(basename "$dir")
     alias "go-$project_name"="go_project $project_name"
-    info "  go-$project_name: $WORK/$project_name" # Optional: uncomment to list generated aliases
+    [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ] && info "  go-$project_name: $WORK/$project_name" 
   done
   return 0
 }

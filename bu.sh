@@ -127,8 +127,9 @@ info() {
 }
 
 debug() {
-    [ "${BU_VERBOSE_LEVEL:-0}" -gt 1 ] \
-    && echo -e "${DEBUG_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Debug: $*${RESET}"
+    if $BU_VERBOSE_LEVEL > 1; then
+        echo -e "${DEBUG_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Debug: $*${RESET}"
+    fi
 }
 
 info_bold() {
@@ -170,10 +171,10 @@ list_bash_functions_in_file() {   # List all function definitions in a file with
         return 1
     fi
     
-    info "Functions defined in [$(basename "$script_path")]: "
     # Use grep to find function definitions that include an inline comment for description
     fs=$(grep -E '^[a-zA-Z0-9_]+\(\)\ *\{\ *#' "$script_path")
-    
+    [ -z "$as" ] || [ "$as" = ":" ] && { info "  No functions found."; return 0; }
+    info "Functions defined in [$(basename "$script_path")]: "
     # Find the maximum length of function names for proper alignment
     max_len=0
     while IFS= read -r line; do
@@ -194,9 +195,9 @@ list_bash_functions_in_file() {   # List all function definitions in a file with
 # -----------------------------------------------------------------------------
 list_alias_in_file() {   # List all alias definitions in this file with descriptions
     local script_path="$1"
-    info "Aliases defined in [$(basename "$script_path")]: "
-    # Use grep to find alias definitions that include an inline comment for description
     as=$(grep -E '^alias [^=]+=.*#' "$script_path")
+    [ -z "$as" ] || [ "$as" = ":" ] && { info "  No aliases found."; return 0; }
+    info "Aliases defined in [$(basename "$script_path")]: "
     # Find the maximum length of alias names
     max_len=0
     while IFS= read -r line; do
