@@ -538,6 +538,7 @@ bu_reload() {   # Reload a specified bash utility (unload and load again) or all
         return 1
     fi
 }
+
 # -----------------------------------------------------------------------------
 # bu command handler at the bottom
 bu() {   # Handle bu command-line interface
@@ -566,6 +567,12 @@ bu() {   # Handle bu command-line interface
         "reload")
             bu_reload "$@"
             ;;
+        "check-updates"|"check")
+            bu_check_updates "$@"
+            ;;
+        "update")
+            bu_update "$@"
+            ;;
         "help"|"--help"|"-h"|"")
             echo "Usage: bu <command> [args]"
             echo "Commands:"
@@ -576,6 +583,8 @@ bu() {   # Handle bu command-line interface
             info "  unload <name>          : Unload a utility"
             info "  functions, funcs [name] : Show functions in loaded utilities"
             info "  reload [name]          : Reload a utility or all utilities"
+            info "  check-updates, check   : Check for updates to BU utilities"
+            info "  update [branch]        : Update BU utilities to latest version"
             info "  help                   : Show this help message"
             ;;
         *)
@@ -588,6 +597,8 @@ bu() {   # Handle bu command-line interface
 
 export BU_SH=$0
 export BU_LOADED=""
+export BU_RELEASE="stable" # Default to stable branch
+
 # BU environment setup
 if printenv BU &>/dev/null; then
     info "BU is already set to: $BU"

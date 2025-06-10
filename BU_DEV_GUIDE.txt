@@ -27,9 +27,22 @@ Structure of a BASH utility file:
 Example template for a new utility file:
 
 #-----------------------------------------------------------------------------
-#!/bin/bash
+#!/bin/env bash
 # Ensure proper Bash Utilities environment
 #-----------------------------------------------------------------------------
+# Ensure proper Bash Utilities environment
+if ! type info &>/dev/null; then
+    echo "ERROR: bu.sh is not loaded. Please source bu.sh first."
+    return 1 2>/dev/null || exit 1
+fi
+# Ensure this file is sourced, not executed
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "ERROR: This script should be sourced, not executed."
+    echo "Usage: source ${BASH_SOURCE[0]}"
+    exit 1
+fi
+#-----------------------------------------------------------------------------
+# Functions that are named <utilname>_<functionality>
 my_function() { # Description of what this function does
   # Function implementation
   if [ -z "$1" ]; then
