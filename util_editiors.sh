@@ -34,6 +34,17 @@ smart_edit() { # Open a file with appropriate editor based on terminal environme
         info "Creating directory: $dir"
         mkdir -p "$dir" || { err "Failed to create directory: $dir"; return 1; }
     fi
+    # Special handling for .code-workspace files
+    if [[ "$file" == *.code-workspace ]]; then
+        if command -v code >/dev/null 2>&1; then
+            info "Opening VS Code workspace file: $file"
+            code "$file"
+            return $?
+        else
+            info "VS Code workspace file detected but 'code' command not found."
+            return 0
+        fi
+    fi
     
     # Check if we're in VS Code terminal
     if [[ "$TERM_PROGRAM" == "vscode" ]]; then
