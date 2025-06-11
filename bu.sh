@@ -173,7 +173,7 @@ list_bash_functions_in_file() {   # List all function definitions in a file with
     
     # Use grep to find function definitions that include an inline comment for description
     fs=$(grep -E '^[a-zA-Z0-9_]+\(\)\ *\{\ *#' "$script_path")
-    [ -z "$as" ] || [ "$as" = ":" ] && { info "  No functions found."; return 0; }
+    [ -z "$fs" ] || [ "$fs" = ":" ] && { warn "No functions found."; return 0; }
     info "Functions defined in [$(basename "$script_path")]: "
     # Find the maximum length of function names for proper alignment
     max_len=0
@@ -196,7 +196,7 @@ list_bash_functions_in_file() {   # List all function definitions in a file with
 list_alias_in_file() {   # List all alias definitions in this file with descriptions
     local script_path="$1"
     as=$(grep -E '^alias [^=]+=.*#' "$script_path")
-    [ -z "$as" ] || [ "$as" = ":" ] && { info "  No aliases found."; return 0; }
+    [ -z "$as" ] || [ "$as" = ":" ] && { warn "  No aliases found."; return 0; }
     info "Aliases defined in [$(basename "$script_path")]: "
     # Find the maximum length of alias names
     max_len=0
