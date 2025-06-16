@@ -32,6 +32,7 @@ change_prompt() { # Change the shell prompt to show project name
     export PROMPT="($prompt_prefix) %~> "
     return 0
 }
+
 gen_vscode_workspace_file() { # Generate a VSCode workspace file for a project
   local project_name="$1"
   local workspace_file="${project_name}.code-workspace"
@@ -137,6 +138,23 @@ list_project_aliases() { # List all available project aliases
   done
   return 0
 }
+# -----------------------------------------------------------------------------
+open_dev_env() {
+  # Find a .code-workspace file in the current directory
+  local ws_file
+  ws_file=$(ls *.code-workspace 2>/dev/null | head -n 1)
+  if [ -n "$ws_file" ]; then
+    info "Opening VS Code workspace: $ws_file"
+    code "$ws_file"
+    return 0
+  else
+    warn "No VS Code workspace file found in $(pwd)"
+    return 1
+  fi
+}
+
+# Create alias for open_dev_env
+alias dev="open_dev_env"
 # -----------------------------------------------------------------------------
 # Adding functions to autogenerate aliases
 check_work_var || { err "Some functions may not work properly without WORK being set"; return 1; }
