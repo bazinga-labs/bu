@@ -581,8 +581,14 @@ bu() {   # Handle bu command-line interface
 export BU_SH=$0
 export_BU_VARS() {   # Export BU environment variables
     export BU_LOADED=""
-    export BU_RELEASE="stable" # Default to stable branch
+    export BU_RELEASE="main" # Default to main branch
     export BU_VERBOSE_LEVEL=1
+    
+    # Auto-update related variables with sensible defaults
+    if [ -z "${BU_AUTO_UPDATE+x}" ]; then export BU_AUTO_UPDATE="true"; fi
+    if [ -z "${BU_AUTO_UPDATE_SILENT+x}" ]; then export BU_AUTO_UPDATE_SILENT="false"; fi
+    if [ -z "${BU_AUTO_STASH+x}" ]; then export BU_AUTO_STASH="false"; fi
+    if [ -z "${BU_RELEASE_CHECK_FREQUENCY+x}" ]; then export BU_RELEASE_CHECK_FREQUENCY="86400"; fi
 }
 
 rollback_BU_VARS() {   # Rollback BU environment variables to pre-export state
@@ -592,6 +598,10 @@ rollback_BU_VARS() {   # Rollback BU environment variables to pre-export state
     unset BU_LOADED
     unset BU_RELEASE
     unset BU_VERBOSE_LEVEL
+    unset BU_AUTO_UPDATE
+    unset BU_AUTO_UPDATE_SILENT
+    unset BU_AUTO_STASH
+    unset BU_RELEASE_CHECK_FREQUENCY
     info "BU environment variables have been rolled back"
 }
 
