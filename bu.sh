@@ -111,31 +111,44 @@ export INFO_COLOR="${CYAN}"
 export BOLD_INFO_COLOR="B${INFO_COLOR}"
 export DEBUG_COLOR="${MAGENTA}"
 
+$BU_VERBOSE_LEVEL=1  # Default verbosity level
+# -1 = No Errors
+# 0 = Show info 
+# 1 = Show info and warnings
+# 2 = show info, warnings, and debug messages
+
+
 # -----------------------------------------------------------------------------
 # Helper functions for formatted output
 # -----------------------------------------------------------------------------
 err() {
-    echo -e "${ERR_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Error: $*${RESET}" >&2
-}
-
-warn() {
-    echo -e "${WARN_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Warning: $*${RESET}" >&2
-}
-
-info() {
-    echo -e "${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
-}
-
-debug() {
-    if $BU_VERBOSE_LEVEL > 1; then
-        echo -e "${DEBUG_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Debug: $*${RESET}"
+    if [ "${BU_VERBOSE_LEVEL:-1}" -gt -1 ]; then
+        echo -e "${ERR_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Error: $*${RESET}" >&2
     fi
 }
 
-info_bold() {
-    echo -e "${BOLD_INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
+warn() {
+    if [ "${BU_VERBOSE_LEVEL:-1}" -ge 1 ]; then
+        echo -e "${WARN_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Warning: $*${RESET}" >&2
+    fi
 }
 
+info() {
+    if [ "${BU_VERBOSE_LEVEL:-1}" -ge 0 ]; then
+        echo -e "${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
+    fi
+}
+info_bold() {
+    if [ "${BU_VERBOSE_LEVEL:-1}" -ge 0 ]; then
+        echo -e "${BOLD}${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
+    fi
+}
+
+debug() {
+    if [ "${BU_VERBOSE_LEVEL:-1}" -ge 2 ]; then
+        echo -e "${DEBUG_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Debug: $*${RESET}"
+    fi
+}
 
 # -----------------------------------------------------------------------------
 bu_util_name() { # Extracts utility name from full path
@@ -544,8 +557,18 @@ bu() {   # Handle bu command-line interface
         "unload")
             bu_unload "$@"
             ;;
-        "functions"|"funcs"|"fn")
+        "functions"|"fn")
             bu_functions "$@"
+            ;;
+        "allfunctions"|"allfns"|"fns")
+            if [ -z "$1" ]; then
+                bu_functions
+            else
+                BU_VERBOSE_LEVEL_SAVED=${BU_VERBOSE_LEVEL:-1}
+                export BU_VERBOSE_LEVEL=0  # Temporarily disable warnings
+                bu_functions | grep -i "$1"
+                export BU_VERBOSE_LEVEL=$BU_VERBOSE_LEVEL_SAVED  # Restore original verbosity
+            fi
             ;;
         "reload")
             bu_reload "$@"
