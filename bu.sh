@@ -26,6 +26,11 @@
 #     BU                : Main utilities directory (auto-detected)
 #     BU_PROJECT_ALIAS  : Directory for project alias scripts (default: ~/.my_projects_aliases)
 #     BU_LOADED         : Colon-separated list of loaded utilities
+#     BU_VERBOSE_LEVEL  : Default verbosity level = 1
+#                         -1 = No Errors
+#                          0 = Show info 
+#                          1 = Show info and warnings
+#                          2 = show info, warnings, and debug messages
 #
 #   Main Function:
 #     bu                : Command-line handler for all utility management operations
@@ -111,11 +116,7 @@ export INFO_COLOR="${CYAN}"
 export BOLD_INFO_COLOR="B${INFO_COLOR}"
 export DEBUG_COLOR="${MAGENTA}"
 
-$BU_VERBOSE_LEVEL=1  # Default verbosity level
-# -1 = No Errors
-# 0 = Show info 
-# 1 = Show info and warnings
-# 2 = show info, warnings, and debug messages
+
 
 
 # -----------------------------------------------------------------------------
