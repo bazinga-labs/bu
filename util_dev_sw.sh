@@ -102,7 +102,7 @@ go_project() { # Navigate to a project directory and set up its environment
   # Load the project environment
   [ -f "${project_name}.env" ] && source "${project_name}.env"
   [ -f venv/bin/activate ] && source venv/bin/activate
-  [ -n "$VIRTUAL_ENV" ] && bu_load pydev || warn "no python env set"
+  [ -n "$VIRTUAL_ENV" ] && bu_load dev_py || warn "no python env set"
   # Check if workspace file exists, create if it doesn't
   if [ ! -f "${project_name}.code-workspace" ]; then
     info "No workspace file found, generating one"
