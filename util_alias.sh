@@ -53,22 +53,31 @@ alias g='grep -i'                # Case-insensitive text search with grep
 # -----------------------------------------------------------------------------
 goto() { # Navigate to directory set in environment variable name
     local var_name="$1"
-    if [ -z "${!var_name}" ]; then
-        err "Error: $var_name environment variable is not set"
+    local var_value=$(eval echo \$${var_name})  # Use eval for more portable indirect reference
+    if [ -z "${var_value}" ]; then
+        err "$var_name environment variable is not set"
         return 1
     fi
-    cd "${!var_name}"
+    cd "${var_value}"
 }
 # -----------------------------------------------------------------------------
-
-# Directory navigation shortcuts
-alias work='goto "WORK"'
-alias docs='goto "DOCS"'
-alias dl='goto "DL"'
-alias idl='goto "iDL"'
-alias idoc='goto "iDOCS"'
-
-
+gen_nav_aliases() { # Automatically create navigation aliases for directory environment variables
+    local var_name var_value
+    # Iterate through all environment variables
+    while IFS='=' read -r var_name var_value; do
+        # Ignore environment variables with empty values
+        if [ -z "$var_value" ]; then
+            continue
+        fi
+        # Only process variables that point to existing directories
+        if [ -d "$var_value" ]; then
+            # Convert variable name to lowercase for consistent alias naming
+            local lowercase_name=$(echo "$var_name" | tr '[:upper:]' '[:lower:]')
+            alias "go-${lowercase_name}"="goto \"$var_name\""
+            info "Created alias: go-${lowercase_name} for $var_name = $var_value"
+        fi
+    done < <(printenv)
+}
 setup_markdown_editor_alias() {  # Check if Markdown Editor app exists in standard locations
     if [[ -d "/Applications/Markdown Editor.app" ]] || [[ -d "$HOME/Applications/Markdown Editor.app" ]]; then
         alias mde='/usr/bin/open -a "Markdown Editor"' # Open with Markdown Editor

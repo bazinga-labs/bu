@@ -9,9 +9,9 @@
 # ==============================================================================
 # DO NOT MODIFY THIS FILE WITHOUT PRIOR AUTHORIZATION
 #
-# This file is managed by Bazinga Labs LLC and changes may be overwritten.
-# Unauthorized edits may result in system malfunction or integration failure.
-# Contact support@bazinga-labs.com for changes or exceptions.
+# This file is maintained by Bazinga Labs LLC and changes may be subject to overwrite.
+# Unauthorized modifications may result in system malfunction or integration failure.
+# Contact support@bazinga-labs.com for change requests or exceptions.
 # ==============================================================================
 
 -----------------------------------------------------------------------------
@@ -19,10 +19,10 @@ BASH UTILITY CREATION GUIDE
 -----------------------------------------------------------------------------
 
 Structure of a BASH utility file:
-1. Each utility file should be named util_<name>.sh
-2. First line must check if util_bash.sh is loaded
-3. Each function should follow the format: function_name() { Description
-4. Use err, warn, and info functions for consistent output
+1. Each utility file must be named util_<name>.sh
+2. The first line must verify that util_bash.sh is loaded
+3. Each function should follow the format: function_name() { # Description
+4. Utilize err, warn, and info functions for standardized output formatting
 
 Example template for a new utility file:
 
@@ -30,44 +30,69 @@ Example template for a new utility file:
 #!/bin/env bash
 # Ensure proper Bash Utilities environment
 #-----------------------------------------------------------------------------
-# Ensure proper Bash Utilities environment
+# Verify Bash Utilities environment is properly initialized
 if ! type info &>/dev/null; then
-    echo "ERROR: bu.sh is not loaded. Please source bu.sh first."
-    return 1 2>/dev/null || exit 1
+  echo "ERROR: bu.sh is not loaded. Please source bu.sh first."
+  return 1 2>/dev/null || exit 1
 fi
-# Ensure this file is sourced, not executed
+# Ensure this file is sourced, not executed directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "ERROR: This script should be sourced, not executed."
-    echo "Usage: source ${BASH_SOURCE[0]}"
-    exit 1
+  echo "ERROR: This script should be sourced, not executed."
+  echo "Usage: source ${BASH_SOURCE[0]}"
+  exit 1
 fi
 #-----------------------------------------------------------------------------
-# Functions that are named <utilname>_<functionality>
-my_function() { # Description of what this function does
+# Functions should be named <utilname>_<functionality>
+my_function() { # Provides a concise description of the function's purpose
   # Function implementation
   if [ -z "$1" ]; then
-    info "Usage: my_function <parameter>"
-    warn "Parameter is required"
-    return 1
+  info "Usage: my_function <parameter>"
+  warn "Parameter is required"
+  return 1
   fi
-  # Logic with proper error handling
+  # Implement logic with proper error handling
   if ! command_that_might_fail; then
-    err "Something went wrong"
-    return 1
+  err "Operation failed: specify error details here"
+  return 1
   fi
   # info "Operation completed successfully"
   return 0
 }
 #-----------------------------------------------------------------------------
-# Create aliases if needed
+# Define aliases if needed for backward compatibility or convenience
 alias my_alias='my_function'
 #-----------------------------------------------------------------------------
  
 Best practices:
-1. Include header with file name, author, and description
-2. Add horizontal lines (-------------) between functions for readability
-3. Document function parameters in the function body
-4. Use return codes: 0 for success, non-zero for errors
-5. Create backward-compatible aliases when renaming functions
-6. Test for requirements before performing operations
-7. Keep functions focused on a single responsibility
+1. Include a comprehensive header with file name, author, and description
+2. Add horizontal lines (-------------) between functions to enhance readability
+3. Document function parameters and expected values within the function body
+4. Use standardized return codes: 0 for success, non-zero for specific error conditions
+5. Create backward-compatible aliases when renaming or deprecating functions
+6. Verify prerequisites and dependencies before performing operations
+7. Design functions to follow the single responsibility principle
+
+-----------------------------------------------------------------------------
+USAGE SECTION FORMATTING RULES (for START_OF_USAGE / END_OF_USAGE in utility headers)
+-----------------------------------------------------------------------------
+
+This section primarily applies to documenting usage for standalone utilities.
+Utilize the automated function usage() provided in bu.sh.
+
+The usage function in bu.sh operates as follows:
+  - Identifies lines beginning with # USAGE: or # START_OF_USAGE
+  - Captures all subsequent lines until # END_OF_USAGE is encountered
+  - Removes the leading # character and optional space from each captured line
+  - Displays the formatted content to the user
+
+Implementation Guidelines:
+- Begin the usage section with "# START_OF_USAGE" or "# USAGE:"
+- Start with a concise description or instructions for sourcing/using the utility
+- List required environment variables, if any, with brief descriptions
+  Format: "# <Env Variable> : Description of what it does"  
+- Under "Main Function" or "Commands", enumerate all available commands/options with clear descriptions
+  Format: "# <Command and option > : Description of what it does"  
+- Include an "Examples:" section with practical usage demonstrations
+  Format: "# <command example> # What this example demonstrates"
+- Group all command options together logically, not interspersed with examples
+- Ensure that the colons (:) and hashes (#) are aligned around 37 characters from the beginning of the line.

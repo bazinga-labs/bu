@@ -18,40 +18,55 @@
 #     - Utility listing, function/alias introspection, and reload support
 #     - Robust error handling and environment validation
 #
+# USAGE:
+# -----------------------------------------------------------------------------
 #   Usage:
 #     Source this file in your shell or scripts to enable the 'bu' command and
 #     related utility management functions.
 #
 #   Environment Variables:
-#     BU                : Main utilities directory (auto-detected)
-#     BU_PROJECT_ALIAS  : Directory for project alias scripts (default: ~/.my_projects_aliases)
-#     BU_LOADED         : Colon-separated list of loaded utilities
-#     BU_VERBOSE_LEVEL  : Default verbosity level = 1
-#                         -1 = No Errors
-#                          0 = Show info 
-#                          1 = Show info and warnings
-#                          2 = show info, warnings, and debug messages
-#
+#     BU                           : Main utilities directory (auto-detected)
+#     BU_LOADED                    : Colon-separated list of loaded utilities
+#     BU_VERBOSE_LEVEL             : Default verbosity level = 1
+#                                   -1 = No Errors
+#                                    0 = Show info 
+#                                    1 = Show info and warnings
+#                                    2 = show info, warnings, and debug messages
 #   Main Function:
-#     bu                : Command-line handler for all utility management operations
-#       - list          : List all available utilities and aliases
-#         Example: bu list
-#       - loaded, ls    : List currently loaded utilities
-#         Example: bu loaded
-#       - load <name>   : Load a utility or alias
-#         Example: bu load dev_py
-#       - loadall       : Load all available utilities and aliases
-#         Example: bu loadall
-#       - unload <name> : Unload a utility
-#         Example: bu unload git
-#       - functions, funcs [name] : Show functions/aliases in loaded utilities
-#         Example: bu functions dev_sw
-#       - reload [name] : Reload a utility or all loaded utilities
-#         Example: bu reload p4
-#         Example: bu reload
-#       - help          : Show help message
-#         Example: bu help
+#     bu                            : Command-line handler for all utility management operations
+#       - list                      : List all available utilities and aliases
+#       - loaded, ls                : List currently loaded utilities
+#       - load <name>               : Load a utility or alias
+#       - loadall                   : Load all available utilities and aliases
+#       - unload <name>             : Unload a utility
+#       - functions, funcs [name]   : Show functions/aliases in loaded utilities or a specific utility
+#       - allfunctions [filter]     : Show all functions in loaded utilities, optionally filter by name
+#       - reload [name]             : Reload a utility or all loaded utilities
+#       - gen_alias [p|n]           : Generate project (p) and/or navigation (n) aliases
+#       - check-updates, check      : Check for updates to the utilities framework
+#       - update                    : Update the utilities framework
+#       - help, -h, --help, ""      : Show help message (also shown if no command is given)
 #
+#   Examples:
+#     bu list                       # List all available utilities and aliases
+#     bu loaded                     # List currently loaded utilities
+#     bu load dev_py                # Load the 'dev_py' utility
+#     bu loadall                    # Load all available utilities and aliases
+#     bu unload git                 # Unload the 'git' utility
+#     bu functions dev_sw           # Show functions/aliases in the 'dev_sw' utility
+#     bu allfunctions run           # Show all functions in loaded utilities, filter by 'run'
+#     bu reload p4                  # Reload the 'p4' utility
+#     bu reload                     # Reload all loaded utilities
+#     bu gen_alias p                # Generate project aliases only
+#     bu gen_alias n                # Generate navigation aliases only
+#     bu gen_alias                  # Generate both project and navigation aliases
+#     bu check-updates              # Check for updates to the utilities framework
+#     bu update                     # Update the utilities framework
+#     bu help                       # Show help message
+#     bu                            # Show help message (no command)
+# -----------------------------------------------------------------------------
+# END_OF_USAGE
+# -----------------------------------------------------------------------------
 #   Helper Functions:
 #     err, warn, info   : Consistent color-coded output
 #     bu_util_name      : Extract utility name from file path
@@ -116,9 +131,6 @@ export INFO_COLOR="${CYAN}"
 export BOLD_INFO_COLOR="B${INFO_COLOR}"
 export DEBUG_COLOR="${MAGENTA}"
 
-
-
-
 # -----------------------------------------------------------------------------
 # Helper functions for formatted output
 # -----------------------------------------------------------------------------
@@ -127,13 +139,11 @@ err() {
         echo -e "${ERR_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Error: $*${RESET}" >&2
     fi
 }
-
 warn() {
     if [ "${BU_VERBOSE_LEVEL:-1}" -ge 1 ]; then
         echo -e "${WARN_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Warning: $*${RESET}" >&2
     fi
 }
-
 info() {
     if [ "${BU_VERBOSE_LEVEL:-1}" -ge 0 ]; then
         echo -e "${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
@@ -144,13 +154,26 @@ info_bold() {
         echo -e "${BOLD}${INFO_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Info: $*${RESET}"
     fi
 }
-
 debug() {
     if [ "${BU_VERBOSE_LEVEL:-1}" -ge 2 ]; then
         echo -e "${DEBUG_COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] Debug: $*${RESET}"
     fi
 }
-
+usage() {
+    # Print the Usage section from the script header using awk for robustness
+    local script_file=""
+    if [ -n "${BASH_SOURCE[0]}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+        script_file="${BASH_SOURCE[0]}"
+    elif [ -n "$0" ] && [ -f "$0" ]; then
+        script_file="$0"
+    elif [ -n "$BU_SH" ] && [ -f "$BU_SH" ]; then
+        script_file="$BU_SH"
+    else
+        err "Cannot display usage: script file not found (tried BASH_SOURCE[0], $0, BU_SH)"
+        return 1
+    fi
+    awk '/^# *USAGE:|^# *START_OF_USAGE/ {show=1; next} /^# *END_OF_USAGE/ {show=0} show { sub(/^# ?/, ""); print }' "$script_file"
+}
 # -----------------------------------------------------------------------------
 bu_util_name() { # Extracts utility name from full path
     local full_path="$1"
@@ -536,12 +559,40 @@ bu_reload() {   # Reload a specified bash utility (unload and load again) or all
     fi
 }
 
+export_BU_VARS() {   # Export BU environment variables
+    export BU_LOADED=""
+    export BU_RELEASE="main" # Default to main branch
+    export BU_VERBOSE_LEVEL=1
+    
+    # Auto-update related variables with sensible defaults
+    if [ -z "${BU_AUTO_UPDATE+x}" ]; then export BU_AUTO_UPDATE="true"; fi
+    if [ -z "${BU_AUTO_UPDATE_SILENT+x}" ]; then export BU_AUTO_UPDATE_SILENT="false"; fi
+    if [ -z "${BU_AUTO_STASH+x}" ]; then export BU_AUTO_STASH="false"; fi
+    if [ -z "${BU_RELEASE_CHECK_FREQUENCY+x}" ]; then export BU_RELEASE_CHECK_FREQUENCY="86400"; fi
+}
+
+rollback_BU_VARS() {   # Rollback BU environment variables to pre-export state
+    # Unset the variables that were exported by export_BU_VARS
+    unset BU
+    unset BU_SH
+    unset BU_LOADED
+    unset BU_RELEASE
+    unset BU_VERBOSE_LEVEL
+    unset BU_AUTO_UPDATE
+    unset BU_AUTO_UPDATE_SILENT
+    unset BU_AUTO_STASH
+    unset BU_RELEASE_CHECK_FREQUENCY
+    info "BU environment variables have been rolled back"
+}
+
+
 # -----------------------------------------------------------------------------
 # bu command handler at the bottom
 bu() {   # Handle bu command-line interface
     local cmd="$1"
-    shift || true  # Shift to get remaining args, continue if no args
-
+    if [ $# -gt 0 ]; then
+        shift  # Only shift if there are arguments left
+    fi
     case "$cmd" in
         "list")
             bu_list "$@"
@@ -574,6 +625,27 @@ bu() {   # Handle bu command-line interface
         "reload")
             bu_reload "$@"
             ;;
+        "gen_alias")
+            local mode="$1"
+            case "$mode" in
+                p)
+                    shift
+                    gen_project_aliases "$@"
+                    ;;
+                n)
+                    shift
+                    bu_load alias
+                    bu_load dev_sw
+                    gen_nav_aliases "$@"
+                    ;;
+                *)
+                    gen_project_aliases "$@"
+                    bu_load alias
+                    bu_load dev_sw
+                    gen_nav_aliases "$@"
+                    ;;
+            esac
+            ;;
         "check-updates"|"check")
             bu_check_updates "$@"
             ;;
@@ -581,18 +653,12 @@ bu() {   # Handle bu command-line interface
             bu_update "$@"
             ;;
         "help"|"--help"|"-h"|"")
-            echo "Usage: bu <command> [args]"
-            echo "Commands:"
-            info "  list                   : List all available utilities"
-            info "  loaded, ls             : List loaded utilities"
-            info "  load <name>            : Load a utility"
-            info "  loadall                : Load all available utilities and aliases"
-            info "  unload <name>          : Unload a utility"
-            info "  functions, funcs [name] : Show functions in loaded utilities"
-            info "  reload [name]          : Reload a utility or all utilities"
-            info "  check-updates, check   : Check for updates to BU utilities"
-            info "  update [branch]        : Update BU utilities to latest version"
-            info "  help                   : Show this help message"
+            if typeset -f usage >/dev/null 2>&1; then
+                usage
+            else
+                err "usage function not found!"
+            fi
+            return 0
             ;;
         *)
             err "Unknown command: $cmd"
@@ -602,36 +668,10 @@ bu() {   # Handle bu command-line interface
     esac
 }
 
+# -----------------------------------------------------------------------------
+# main
+# -----------------------------------------------------------------------------
 export BU_SH=$0
-export_BU_VARS() {   # Export BU environment variables
-    export BU_LOADED=""
-    export BU_RELEASE="main" # Default to main branch
-    export BU_VERBOSE_LEVEL=1
-    
-    # Auto-update related variables with sensible defaults
-    if [ -z "${BU_AUTO_UPDATE+x}" ]; then export BU_AUTO_UPDATE="true"; fi
-    if [ -z "${BU_AUTO_UPDATE_SILENT+x}" ]; then export BU_AUTO_UPDATE_SILENT="false"; fi
-    if [ -z "${BU_AUTO_STASH+x}" ]; then export BU_AUTO_STASH="false"; fi
-    if [ -z "${BU_RELEASE_CHECK_FREQUENCY+x}" ]; then export BU_RELEASE_CHECK_FREQUENCY="86400"; fi
-}
-
-rollback_BU_VARS() {   # Rollback BU environment variables to pre-export state
-    # Unset the variables that were exported by export_BU_VARS
-    unset BU
-    unset BU_SH
-    unset BU_LOADED
-    unset BU_RELEASE
-    unset BU_VERBOSE_LEVEL
-    unset BU_AUTO_UPDATE
-    unset BU_AUTO_UPDATE_SILENT
-    unset BU_AUTO_STASH
-    unset BU_RELEASE_CHECK_FREQUENCY
-    info "BU environment variables have been rolled back"
-}
-
-# Call the function to set variables
-
-# BU environment setup
 if printenv BU &>/dev/null; then
     info "BU is already set to: $BU"
     export BU
