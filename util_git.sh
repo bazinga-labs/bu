@@ -8,6 +8,23 @@
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
+# Helper function for common push operation
+_git_push_current_branch() {
+    local current_branch
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    local repo_url
+    repo_url=$(git config --get remote.origin.url)
+    info "Pushing changes to remote: $repo_url"
+    git push origin "$current_branch"
+    local push_status=$?
+    if [ $push_status -ne 0 ]; then
+        err "Failed to push to remote repository."
+        return 1
+    fi
+    return 0
+}
+
+# -----------------------------------------------------------------------------
 git_is_repo() { # Checks if the current directory is within a git repository
     # Check if inside a git repository
     if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -35,23 +52,39 @@ git_file_info() { # Displays version information for a given file based on git h
     [ -z "$file" ] && { err "No file specified."; return 1; }
     [ ! -f "$file" ] && { err "File '$file' does not exist."; return 1; }
     
-    # Assuming we're in a git repository
+    # Get all git info in a single call to reduce overhead
+    local git_info
+    git_info=$(git log -n 1 --pretty=format:"%h|%ad|%s" --date=short -- "$file" 2>/dev/null)
+    [ -z "$git_info" ] && { err "File '$file' not found in git history."; return 1; }
+    
+    # Parse the git info
+    local git_sha="${git_info%%|*}"
+    local git_date="${git_info#*|}"; git_date="${git_date%%|*}"
+    local git_msg="${git_info##*|}"
+    
+    # Calculate SHA values in parallel using command substitution
+    local local_sha git_file_content
+    local_sha=$(shasum -a 256 "$file" | awk '{print $1}')
+    git_file_content=$(git show "$git_sha:$file" 2>/dev/null | shasum -a 256 | awk '{print $1}')
+    
+    # Get tags containing the commit
+    local tags=$(git tag --contains "$git_sha" 2>/dev/null | tr '\n' ' ')
+    
+    # Display information
     info "File Version Info: $file"
-    info "Version: $(git log -n 1 --pretty=format:"%h" -- "$file")"
-    info "Last Updated: $(git log -n 1 --pretty=format:"%ad" --date=short -- "$file")"
-    info "Last Update Message: $(git log -n 1 --pretty=format:"%s" -- "$file")"
-    local git_sha=$(git log -n 1 --pretty=format:"%h" -- "$file")
-    local local_sha=$(shasum -a 256 "$file" | awk '{print $1}')
-    local git_file_content=$(git show "$git_sha:$file" 2>/dev/null | shasum -a 256 | awk '{print $1}')
-    info "Tags: $(git tag --contains $git_sha | tr '\n' ' ')"
+    info "Version: $git_sha"
+    info "Last Updated: $git_date"
+    info "Last Update Message: $git_msg"
+    info "Tags: ${tags:-none}"
     info "SHA (Git): $git_file_content"
-        if [ "$local_sha" != "$git_file_content" ]; then
-            info "Status: MODIFIED"
-            info "SHA (Local): $local_sha (modified)"
-        else
-            info "Status: UNCHANGED"
-            info "SHA (Local): $local_sha"
-        fi
+    
+    if [ "$local_sha" != "$git_file_content" ]; then
+        info "Status: MODIFIED"
+        info "SHA (Local): $local_sha (modified)"
+    else
+        info "Status: UNCHANGED"
+        info "SHA (Local): $local_sha"
+    fi
 }
 
 # -----------------------------------------------------------------------------
@@ -60,41 +93,40 @@ git_file_history() { # Outputs the git commit history for the specified file, fo
     [ -z "$file" ] && { err "No file specified."; return 1; }
     [ ! -f "$file" ] && { err "File '$file' does not exist."; return 1; }
     
-    # Assuming we're in a git repository
     info "Git history for file: $file"
-    # Get total number of commits for this file
-    local total=$(git log --follow --oneline -- "$file" | wc -l | tr -d ' ')
-    # Show history with version numbering
-    git log --reverse --follow --pretty=format:"%C(green)%D%C(reset)/v%H,%C(yellow)%h%C(reset),%ad,%s" --date=format:"%Y-%m-%d %H:%M:%S" -- "$file" | 
-    awk -v total="$total" '{
-        # Extract branch info
-        branch = "";
-        if ($0 ~ /,/) {
-            split($0, parts, ",");
-            if (parts[1] ~ /HEAD -> /) {
-                gsub(".*HEAD -> ", "", parts[1]);
-                branch = parts[1];
-            } else if (parts[1] ~ /tag: /) {
-                gsub(".*tag: ", "", parts[1]);
-                branch = parts[1];
-            }
-            if (branch == "") branch = "main";
+    
+    # Generate history in a single optimized git command
+    local temp_file="/tmp/git-file-history-$$.csv"
+    
+    # Use more efficient git log format and simpler awk processing
+    git log --reverse --follow --pretty=format:"%D,%h,%ad,%s" --date=format:"%Y-%m-%d %H:%M:%S" -- "$file" | 
+    awk -F',' 'BEGIN{OFS=","} {
+        # Determine branch from first field
+        branch = "main";
+        if ($1 ~ /HEAD -> /) {
+            gsub(".* -> ", "", $1);
+            gsub(/,.*/, "", $1);
+            branch = $1;
+        } else if ($1 ~ /tag: /) {
+            gsub(".*tag: ", "", $1);
+            gsub(/,.*/, "", $1);
+            branch = $1;
         }
-        # Replace version hash with version number
-        gsub("v[0-9a-f]+", "v" NR, $0);
-        # Print with branch prefix for version number
-        if (branch != "") {
-            sub("v" NR, branch "/v" NR, $0);
-        }
-        print $0;
-    }' > /tmp/git-file-history.csv
-    # Open the CSV file with smart_edit
-    smart_edit /tmp/git-file-history.csv
+        # Format output with version number
+        printf "%s/v%d,%s,%s,%s\n", branch, NR, $2, $3, $4;
+    }' > "$temp_file"
+    
+    # Open the CSV file with smart_edit if available, otherwise display info
+    if command -v smart_edit >/dev/null 2>&1; then
+        smart_edit "$temp_file"
+    else
+        info "Git history saved to: $temp_file"
+        head -10 "$temp_file" 2>/dev/null || true
+    fi
 }
 
 # -----------------------------------------------------------------------------
 git_find_modified() { # Find all files that differ from HEAD
-    # Assuming we're in a git repository
     local include_unmanaged=false
     
     # Process command-line options
@@ -106,75 +138,89 @@ git_find_modified() { # Find all files that differ from HEAD
         shift
     done
     
-    # Check if there are any changes
-    if git diff-index --quiet HEAD -- && [ "$include_unmanaged" = false ]; then
-        info "All tracked files are up to date with HEAD"
+    # Get all status information in one command
+    local status_output
+    if [ "$include_unmanaged" = true ]; then
+        status_output=$(git status --porcelain=v1 2>/dev/null)
+    else
+        status_output=$(git status --porcelain=v1 2>/dev/null | grep -E '^[MADRCU ]M|^M[MADRCU ]|^A[MADRCU ]|^D[MADRCU ]|^R[MADRCU ]|^C[MADRCU ]|^U[MADRCU ]')
+    fi
+    
+    # Early exit if no changes
+    if [ -z "$status_output" ]; then
+        info "All files are up to date with HEAD"
         return 0
     fi
     
-    # Header
     info "Files not in sync with HEAD:"
     
-    # Show modified files
-    local modified_files=$(git diff --name-only HEAD)
-    if [ -n "$modified_files" ]; then
-        info "${YELLOW}Modified files:${RESET}"
-        echo "$modified_files" | sort | while read -r file; do
-            echo -e " ${YELLOW}M${RESET} $file"
-        done
-    else
-        info "${GREEN}No modified tracked files${RESET}"
-    fi
+    # Process status output more efficiently
+    local has_modified=false has_unmanaged=false
     
-    # Show unmanaged files if requested - these respect .gitignore by default
-    if [ "$include_unmanaged" = true ]; then
-        # Git's ls-files --others --exclude-standard excludes files in .gitignore
-        local unmanaged_files=$(git ls-files --others --exclude-standard)
-        if [ -n "$unmanaged_files" ]; then
-            info "${ORANGE}Unmanaged files (not in git repo):${RESET}"
-            echo "$unmanaged_files" | sort | while read -r file; do
-                echo -e " ${ORANGE}U${RESET} $file"
-            done
-        else
-            info "${GREEN}No unmanaged files${RESET}"
-        fi
-    fi
+    echo "$status_output" | while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        
+        local status="${line:0:2}"
+        local file="${line:3}"
+        
+        case "$status" in
+            ' M'|'M '|'MM'|'AM'|'AD'|'RM'|'CM')
+                if [ "$has_modified" = false ]; then
+                    echo -e "${YELLOW}Modified files:${RESET}"
+                    has_modified=true
+                fi
+                echo -e " ${YELLOW}M${RESET} $file"
+                ;;
+            '??')
+                if [ "$include_unmanaged" = true ]; then
+                    if [ "$has_unmanaged" = false ]; then
+                        echo -e "${ORANGE}Unmanaged files (not in git repo):${RESET}"
+                        has_unmanaged=true
+                    fi
+                    echo -e " ${ORANGE}U${RESET} $file"
+                fi
+                ;;
+            *)
+                if [ "$has_modified" = false ]; then
+                    echo -e "${YELLOW}Modified files:${RESET}"
+                    has_modified=true
+                fi
+                echo -e " ${YELLOW}${status:0:1}${RESET} $file"
+                ;;
+        esac
+    done
 }
 
 # -----------------------------------------------------------------------------
 git_checkout_head() {   # Replace local file with HEAD version from git
-    [ -z "$1" ] && { echo -e "${RED}Error: No file specified.${RESET}"; return 1; }
+    [ -z "$1" ] && { err "No file specified."; return 1; }
     local file="$1"
-    [ ! -f "$file" ] && { echo -e "${RED}Error: File '$file' does not exist.${RESET}"; return 1; }
+    [ ! -f "$file" ] && { err "File '$file' does not exist."; return 1; }
     
-    # Assuming we're in a git repository
-    echo -e "${BLUE}Replacing local file with version from HEAD:${RESET} $file"
+    info "Replacing local file with version from HEAD: $file"
     
-    # Try newer git restore command first, fall back to checkout if not available
-    if git help restore &>/dev/null; then
-        git restore --source=HEAD "$file"
+    # Use modern git restore or fallback to checkout
+    if git restore --source=HEAD "$file" 2>/dev/null; then
+        info "Successfully restored '$file' from HEAD."
+    elif git checkout HEAD -- "$file" 2>/dev/null; then
+        info "Successfully restored '$file' from HEAD."
     else
-        git checkout HEAD -- "$file"
-    fi
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}Successfully restored '$file' from HEAD.${RESET}"
-    else
-        echo -e "${RED}Failed to restore '$file' from HEAD.${RESET}"
+        err "Failed to restore '$file' from HEAD."
         return 1
     fi
 }
 
 # -----------------------------------------------------------------------------
 git_discard_changes() { # Discards local modifications to a specified file
-    # Assuming we're in a remote git repository
-    # Validate input parameter
     [ -z "$1" ] && { info "Usage: git_discard_changes <file>"; return 1; }
     [ ! -f "$1" ] && { err "File not found: $1"; return 1; }
     
-    # Discard local changes and replace the file with version from HEAD
-    git checkout HEAD -- "$1"
-    info "Discarded changes to $1. File replaced with HEAD version."
+    # Use modern git restore or fallback to checkout
+    if git restore --source=HEAD "$1" 2>/dev/null; then
+        info "Discarded changes to $1. File replaced with HEAD version."
+    else
+        git checkout HEAD -- "$1" && info "Discarded changes to $1. File replaced with HEAD version."
+    fi
 }
 
 # -----------------------------------------------------------------------------
@@ -226,17 +272,7 @@ git_checkin() { # Commit multiple files to GitHub repo using a commit message pr
     
     # Push if requested
     if [ "$push_flag" = "push" ]; then
-        local current_branch
-        current_branch=$(git rev-parse --abbrev-ref HEAD)
-        local repo_url
-        repo_url=$(git config --get remote.origin.url)
-        info "Pushing changes to remote: $repo_url"
-        git push origin "$current_branch"
-        local push_status=$?
-        if [ $push_status -ne 0 ]; then
-            err "Failed to push to remote repository."
-            return 1
-        fi
+        _git_push_current_branch
     fi
     
     info "Files committed successfully."
@@ -275,27 +311,17 @@ git_update_files() { # Update files from git repository with various options
             return 0
         fi
         
-        # If only_unmodified flag is set, update only unmodified files
+            # If only_unmodified flag is set, update only unmodified files
         if [ "$only_unmodified" = true ]; then
             info "Updating only unmodified files..."
-            # Get list of tracked files
-            local all_files=$(git ls-files)
-            # Get list of modified files
+            # Get modified and all files in single operation
             local modified_files=$(git diff --name-only HEAD)
             
-            # Process each file
-            echo "$all_files" | while read -r file; do
-                if ! echo "$modified_files" | grep -q "^$file$"; then
-                    # This file is not modified, update it
+            # Use git ls-files to get all tracked files, filter out modified ones
+            git ls-files | while read -r file; do
+                if ! echo "$modified_files" | grep -q "^${file}$"; then
                     info "Updating unmodified file: $file"
-                    if git help restore &>/dev/null; then
-                        git restore --source=origin/HEAD "$file" 2>/dev/null || 
-                        git restore --source=HEAD "$file"
-                    else
-                        git checkout HEAD -- "$file"
-                    fi
-                else
-                    info "Skipping modified file: $file"
+                    git restore --source=HEAD "$file" 2>/dev/null || git checkout HEAD -- "$file"
                 fi
             done
             info "Unmodified files updated successfully."
@@ -319,27 +345,21 @@ git_update_files() { # Update files from git repository with various options
             continue
         fi
         
-        # Check if file is modified locally
-        local is_modified=false
-        git diff --quiet HEAD -- "$file" || is_modified=true
-        
-        # Apply update logic
-        if [ "$is_modified" = true ] && [ "$only_unmodified" = true ] && [ "$force" = false ]; then
+        # Check if file is modified locally (more efficient check)
+        if git diff --quiet HEAD -- "$file"; then
+            # File is not modified
+            info "Updating file: $file"
+            git restore --source=HEAD "$file" 2>/dev/null || git checkout HEAD -- "$file"
+        elif [ "$force" = true ]; then
+            # File is modified but force flag is set
+            info "Force updating modified file: $file"
+            git restore --source=HEAD "$file" 2>/dev/null || git checkout HEAD -- "$file"
+        elif [ "$only_unmodified" = true ]; then
+            # File is modified and only_unmodified is true
             info "Skipping modified file: $file"
         else
-            if [ "$is_modified" = true ] && [ "$force" = false ]; then
-                warn "File has local modifications. Use --force to overwrite: $file"
-                continue
-            fi
-            
-            info "Updating file: $file"
-            # Try to get from origin/HEAD first, fall back to HEAD
-            if git help restore &>/dev/null; then
-                git restore --source=origin/HEAD "$file" 2>/dev/null || 
-                git restore --source=HEAD "$file"
-            else
-                git checkout HEAD -- "$file"
-            fi
+            # File is modified and no force flag
+            warn "File has local modifications. Use --force to overwrite: $file"
         fi
     done
     
@@ -419,17 +439,7 @@ git_delete_file() { # Remove a file from git repository
     
     # Push if requested
     if [ "$push_flag" = true ]; then
-        local current_branch
-        current_branch=$(git rev-parse --abbrev-ref HEAD)
-        local repo_url=$(git config --get remote.origin.url)
-        info "Pushing changes to remote: $repo_url"
-        git push origin "$current_branch"
-        local push_status=$?
-        
-        if [ $push_status -ne 0 ]; then
-            err "Failed to push to remote repository."
-            return 1
-        fi
+        _git_push_current_branch
     fi
     
     info "File '$file' has been removed from git repository."
@@ -438,67 +448,49 @@ git_delete_file() { # Remove a file from git repository
 
 # -----------------------------------------------------------------------------
 git_tkdiff_remote() { # Compares a local file to its counterpart on the remote origin
-  if [ -z "$1" ]; then
-    info "Usage: git_tkdiff_remote <file>"
-    return 1
-  fi
-
-  local file="$1"
-  
-  # Check if tkdiff is installed
-  if ! command -v tkdiff >/dev/null 2>&1; then
-    err "tkdiff is not installed. Please install tkdiff to use this function."
-    return 1
-  fi
-  
-  # Get branch and remote information
-  local branch
-  branch=$(git rev-parse --abbrev-ref HEAD)
-  local repo_url=$(git config --get remote.origin.url)
-  
-  info "Remote repository: $repo_url"
-  info "Current branch: $branch"
-  info "Comparing local '$file' with remote 'origin/$branch:$file'"
-
-  # Check if remote is accessible
-  if ! git ls-remote --exit-code origin &>/dev/null; then
-    err "Remote 'origin' not found or not accessible."
-    return 1
-  fi
-
-  # Check if the branch exists on the remote
-  if ! git ls-remote --heads origin "$branch" | grep -q "$branch"; then
-    err "Branch '$branch' does not exist on remote 'origin'."
-    return 1
-  fi
-
-  # Check if file exists on the remote
-  if ! git ls-tree -r "origin/$branch" --name-only | grep -q "^$file$"; then
-    err "File '$file' not found in origin/$branch."
-    return 1
-  fi
-
-  # Create a temporary file for the remote version
-  local temp_file=$(mktemp /tmp/git-remote-XXXXXX)
-  
-  # Save remote file content to the temporary file
-  git show "origin/$branch:$file" > "$temp_file"
-  
-  # Check if we successfully retrieved the remote file content
-  if [ ! -s "$temp_file" ]; then
-    err "Failed to retrieve remote file content."
-    rm -f "$temp_file"
-    return 1
-  fi
-  
-  # Run tkdiff with local and temporary remote files
-  info "Running tkdiff..."
-  tkdiff "$file" "$temp_file"
-  
-  # Clean up the temporary file
-  rm -f "$temp_file"
-  
-  return 0
+    [ -z "$1" ] && { info "Usage: git_tkdiff_remote <file>"; return 1; }
+    
+    local file="$1"
+    
+    # Verify prerequisites in parallel
+    if ! command -v tkdiff >/dev/null 2>&1; then
+        err "tkdiff is not installed. Please install tkdiff to use this function."
+        return 1
+    fi
+    
+    # Get branch and remote info efficiently
+    local branch repo_url
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || { err "Not in a git repository."; return 1; }
+    repo_url=$(git config --get remote.origin.url 2>/dev/null) || { err "No remote origin configured."; return 1; }
+    
+    info "Remote repository: $repo_url"
+    info "Current branch: $branch"
+    info "Comparing local '$file' with remote 'origin/$branch:$file'"
+    
+    # Validate remote accessibility and file existence in one operation
+    if ! git cat-file -e "origin/$branch:$file" 2>/dev/null; then
+        # Fetch first in case remote is stale
+        git fetch origin "$branch" &>/dev/null
+        if ! git cat-file -e "origin/$branch:$file" 2>/dev/null; then
+            err "File '$file' not found in origin/$branch or remote not accessible."
+            return 1
+        fi
+    fi
+    
+    # Create temporary file and run diff
+    local temp_file
+    temp_file=$(mktemp "/tmp/git-remote-$$.XXXXXX") || { err "Failed to create temporary file."; return 1; }
+    
+    if git show "origin/$branch:$file" > "$temp_file" 2>/dev/null; then
+        info "Running tkdiff..."
+        tkdiff "$file" "$temp_file"
+        rm -f "$temp_file"
+        return 0
+    else
+        err "Failed to retrieve remote file content."
+        rm -f "$temp_file"
+        return 1
+    fi
 }
 
 # -----------------------------------------------------------------------------

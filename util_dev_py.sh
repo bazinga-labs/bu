@@ -149,4 +149,9 @@ brew_clean_cache() { # Clear Homebrew cache
 # -----------------------------------------------------------------------------
 alias clean-pycache='find . -type d -name "__pycache__" -exec rm -rf {} +'
 alias clean-pip-cache='pip cache purge'
+alias venv-activate='source venv/bin/activate'
+alias venv-deactivate='deactivate'
+alias venv-init='venv_init'
+alias venv-recreate='venv_init'
+alias venv-remove='rm -rf venv && echo "Virtual environment removed."'
 # -----------------------------------------------------------------------------
