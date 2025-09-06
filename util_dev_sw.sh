@@ -38,9 +38,14 @@ gen_vscode_workspace_file() { # Generate a VSCode workspace file for a project
   local workspace_file="${project_name}.code-workspace"
   
   if [ -z "$project_name" ]; then
-    err "No project name provided."
-    info "Usage: gen_vscode_workspace <project_name>"
+    warn "No project name provided."
+  project_name="${PWD##*/}"
+  if [ -z "$project_name" ]; then
+    err "Cannot determine project name from current directory."
     return 1
+  fi
+  workspace_file="${project_name}.code-workspace"
+  info "Using current directory name as project: $project_name"
   fi
   
   if [ -f "$workspace_file" ]; then
