@@ -558,6 +558,7 @@ git_update() { # Updates the git working directory with latest changes from remo
     local branch=${1:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}
     local remote=${2:-origin}
     local stash_changes=true
+    local recurse_submodules=false
     
     # Process command-line options
     while [ "$#" -gt 0 ]; do
@@ -565,6 +566,7 @@ git_update() { # Updates the git working directory with latest changes from remo
             -n|--no-stash) stash_changes=false ;;
             --branch=*) branch="${1#*=}" ;;
             --remote=*) remote="${1#*=}" ;;
+            -s|--submodules|--recurse-submodules) recurse_submodules=true ;;
             *) break ;;
         esac
         shift
@@ -577,6 +579,9 @@ git_update() { # Updates the git working directory with latest changes from remo
     fi
     
     info "Updating git repository from remote: $remote/$branch"
+    if [ "$recurse_submodules" = true ]; then
+        info "Submodule updates enabled (--recurse-submodules)"
+    fi
     
     # Check for local changes
     if ! git diff-index --quiet HEAD --; then
@@ -607,12 +612,30 @@ git_update() { # Updates the git working directory with latest changes from remo
         
         # Pull changes
         info "Pulling latest changes for $branch..."
-        git pull --ff-only "$remote" "$branch" || {
-            warn "Fast-forward pull failed. Trying rebase..."
-            git pull --rebase "$remote" "$branch" || {
-                err "Failed to update branch. Please resolve conflicts manually.";
-                return 1;
+        if [ "$recurse_submodules" = true ]; then
+            git pull --recurse-submodules --ff-only "$remote" "$branch" || {
+                warn "Fast-forward pull failed. Trying rebase..."
+                git pull --recurse-submodules --rebase "$remote" "$branch" || {
+                    err "Failed to update branch. Please resolve conflicts manually.";
+                    return 1;
+                }
             }
+        else
+            git pull --ff-only "$remote" "$branch" || {
+                warn "Fast-forward pull failed. Trying rebase..."
+                git pull --rebase "$remote" "$branch" || {
+                    err "Failed to update branch. Please resolve conflicts manually.";
+                    return 1;
+                }
+            }
+        fi
+    fi
+    
+    # Update submodules if requested
+    if [ "$recurse_submodules" = true ]; then
+        info "Updating submodules..."
+        git submodule update --init --recursive --remote || {
+            warn "Failed to update submodules. Some submodules may not be up to date."
         }
     fi
     
@@ -626,6 +649,9 @@ git_update() { # Updates the git working directory with latest changes from remo
     fi
     
     info "Git repository updated successfully to latest $remote/$branch."
+    if [ "$recurse_submodules" = true ]; then
+        info "Submodules also updated to their latest remote versions."
+    fi
     return 0
 }
 # -----------------------------------------------------------------------------
