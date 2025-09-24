@@ -8,19 +8,31 @@
 # -----------------------------------------------------------------------------
 # Check if WORK environment variable is set
 check_work_var() {
-  if [ -z "$WORK" ]; then
-    err "WORK environment variable is not set."
-    info "Please set WORK variable to your projects directory: export WORK=/path/to/project-workareas"
+  local has_work=0
+  local has_analysis=0
+  
+  if [ -n "$WORK" ] && [ -d "$WORK" ]; then
+    info "WORK: $WORK"
+    has_work=1
+  elif [ -n "$WORK" ]; then
+    warn "WORK is set but directory does not exist: $WORK"
+  fi
+  
+  if [ -n "$ANALYSIS" ] && [ -d "$ANALYSIS" ]; then
+    info "ANALYSIS: $ANALYSIS"
+    has_analysis=1
+  elif [ -n "$ANALYSIS" ]; then
+    warn "ANALYSIS is set but directory does not exist: $ANALYSIS"
+  fi
+  
+  if [ $has_work -eq 0 ] && [ $has_analysis -eq 0 ]; then
+    err "Neither WORK nor ANALYSIS environment variables are properly set."
+    info "Please set at least one variable to your projects directory:"
+    info "  export WORK=/path/to/project-workareas"
+    info "  export ANALYSIS=/path/to/analysis-projects"
     return 1
   fi
   
-  if [ ! -d "$WORK" ]; then
-    err "WORK directory does not exist: $WORK"
-    info "Please create the directory or set WORK to an existing directory"
-    return 1
-  fi
-  
-  info "WORK:$WORK "
   return 0
 }
 
@@ -83,14 +95,29 @@ go_project() { # Navigate to a project directory and set up its environment
     return 1
   fi
   local project_name="$1"
-  if [ -z "$WORK" ] || [ ! -d "$WORK" ]; then
-    err "\$WORK directory is not defined or doesn't exist: '$WORK'"
+  local project_path=""
+  
+  # Check if either WORK or ANALYSIS environment variables are set
+  if [ -z "$WORK" ] && [ -z "$ANALYSIS" ]; then
+    err "Neither \$WORK nor \$ANALYSIS directory is defined."
+    info "Please set either WORK or ANALYSIS variable to your projects directory."
     return 1
   fi
-  if [ ! -d "$WORK/$project_name" ]; then
-    err "Project '$project_name' does not exist under $WORK."
+  
+  # Try to find the project in WORK first, then ANALYSIS
+  if [ -n "$WORK" ] && [ -d "$WORK" ] && [ -d "$WORK/$project_name" ]; then
+    project_path="$WORK/$project_name"
+    info "Found project in WORK directory: $project_path"
+  elif [ -n "$ANALYSIS" ] && [ -d "$ANALYSIS" ] && [ -d "$ANALYSIS/$project_name" ]; then
+    project_path="$ANALYSIS/$project_name"
+    info "Found project in ANALYSIS directory: $project_path"
+  else
+    err "Project '$project_name' does not exist under WORK or ANALYSIS directories."
+    [ -n "$WORK" ] && [ -d "$WORK" ] && info "Checked WORK: $WORK"
+    [ -n "$ANALYSIS" ] && [ -d "$ANALYSIS" ] && info "Checked ANALYSIS: $ANALYSIS"
     return 1
   fi
+  
   if [ -n "$PROJECT_NAME" ]; then
     info "Deactivating current project: $PROJECT_NAME"
     deactivate 2>/dev/null || info "No virtual environment to deactivate."
@@ -99,7 +126,7 @@ go_project() { # Navigate to a project directory and set up its environment
   fi
   # This is the new project name
   export PROJECT_NAME="$project_name"
-  export PROJECT_WORKSPACE="$WORK/$project_name"
+  export PROJECT_WORKSPACE="$project_path"
 
   cd "$PROJECT_WORKSPACE" || err "Failed to change directory to $PROJECT_WORKSPACE"
 
@@ -124,14 +151,35 @@ go_project() { # Navigate to a project directory and set up its environment
   return 0
 }
 # -----------------------------------------------------------------------------
-gen_project_aliases() { # Generate aliases for all projects in the WORK directory
+gen_project_aliases() { # Generate aliases for all projects in the WORK and ANALYSIS directories
    [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ] && info "Generating project aliases"
-  for dir in "$WORK"/*/; do
-    [ -d "$dir" ] || continue
-    local project_name=$(basename "$dir")
-    alias "go-$project_name"="go_project $project_name"
-    [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ] && info "  go-$project_name: $WORK/$project_name" 
-  done
+  
+  # Process WORK directory if it exists
+  if [ -n "$WORK" ] && [ -d "$WORK" ]; then
+    [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ] && info "Scanning WORK directory: $WORK"
+    for dir in "$WORK"/*/; do
+      [ -d "$dir" ] || continue
+      local project_name=$(basename "$dir")
+      alias "go-$project_name"="go_project $project_name"
+      [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ] && info "  go-$project_name: $WORK/$project_name" 
+    done
+  fi
+  
+  # Process ANALYSIS directory if it exists
+  if [ -n "$ANALYSIS" ] && [ -d "$ANALYSIS" ]; then
+    [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ] && info "Scanning ANALYSIS directory: $ANALYSIS"
+    for dir in "$ANALYSIS"/*/; do
+      [ -d "$dir" ] || continue
+      local project_name=$(basename "$dir")
+      # Only create alias if it doesn't already exist (WORK takes precedence)
+      if ! alias "go-$project_name" >/dev/null 2>&1; then
+        alias "go-$project_name"="go_project $project_name"
+        [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ] && info "  go-$project_name: $ANALYSIS/$project_name" 
+      else
+        [ "${BU_VERBOSE_LEVEL:-1}" -ne 0 ] && info "  go-$project_name: skipped (already exists from WORK)" 
+      fi
+    done
+  fi
   return 0
 }
 # -----------------------------------------------------------------------------
@@ -139,7 +187,14 @@ list_project_aliases() { # List all available project aliases
   info "Available project aliases:"
   alias | grep "go-" | sed 's/^alias //; s/=.*$//' | sort | while read -r alias_name; do
     local project_name=${alias_name#go-}
-    info "   $alias_name → $WORK/$project_name"
+    # Check which directory contains the project
+    if [ -n "$WORK" ] && [ -d "$WORK" ] && [ -d "$WORK/$project_name" ]; then
+      info "   $alias_name → $WORK/$project_name"
+    elif [ -n "$ANALYSIS" ] && [ -d "$ANALYSIS" ] && [ -d "$ANALYSIS/$project_name" ]; then
+      info "   $alias_name → $ANALYSIS/$project_name"
+    else
+      info "   $alias_name → (project not found)"
+    fi
   done
   return 0
 }
