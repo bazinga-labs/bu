@@ -673,10 +673,8 @@ bu() {   # Handle bu command-line interface
 # -----------------------------------------------------------------------------
 export BU_SH=$0
 if printenv BU &>/dev/null; then
-    info "BU is already set to: $BU"
     export BU
 else
-    info "BU is not set, setting based on $BU_SH"
     export BU="$(dirname $0)"
 fi
 [ ! -d "$BU" ] && \
@@ -685,7 +683,8 @@ fi
     return 1; 
 }
 export_BU_VARS
-info "$BU_SH: BU environment initialized successfully \$BU=$BU"
+#info "$BU_SH: BU environment initialized successfully \$BU=$BU"
+info "Loaded BU env"
 
 
 

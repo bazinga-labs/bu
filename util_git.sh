@@ -252,8 +252,46 @@ util_git_checkin() { # Commit changes to main repo and all submodules
     info "Check-in completed successfully."
     return 0
 }
+util_git_add_submodule() { # Add a git submodule with specific naming convention and update it
+    local usage="Usage: git_add_submodule <repo-url>"
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        info "$usage"
+        info "  Adds submodule to ./libs/<bar> where repo is <foo>-<bar>.git"
+        return 0
+    fi
 
+    if [[ $# -ne 1 ]]; then
+        err "$usage"
+        return 1
+    fi
+
+    local repo_url="$1"
+    # Extract <bar> from <foo>-<bar>.git
+    local repo_name
+    repo_name=$(basename "$repo_url" .git)
+    if [[ "$repo_name" != *-* ]]; then
+        err "Repo name must be in <foo>-<bar>.git format."
+        return 1
+    fi
+    local bar="${repo_name#*-}"
+    local submodule_path="libs/$bar"
+
+    info "Adding submodule: $repo_url to $submodule_path"
+    if ! git submodule add "$repo_url" "$submodule_path"; then
+        err "Failed to add submodule."
+        return 1
+    fi
+
+    info "Updating submodule: $submodule_path"
+    if ! git submodule update --init --recursive "$submodule_path"; then
+        err "Failed to update submodule."
+        return 1
+    fi
+
+    info "Submodule added and updated successfully."
+}
 # Convenience aliases: expose user-friendly comma
+alias git-add-submodule='util_git_add_submodule' # Add a git submodule with specific naming convention and update it
 alias git-update='util_git_update'  # Update main repo and/or submodules
 alias git-set-branch='util_git_set_branch' # Create/set feature/bug branch in main and submodules
 alias git-checkin='util_git_checkin' # Commit changes to main repo and all submodules

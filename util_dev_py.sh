@@ -10,22 +10,6 @@
 # To use: brew install pyenv
 # Then, pyenv install <version>
 # And pyenv global <version> or pyenv local <version>
-pydev_init() {
-    if command -v pyenv &>/dev/null; then
-        export PYENV_ROOT="$HOME/.pyenv"
-        if [[ -d "$PYENV_ROOT/bin" ]]; then # Check if PYENV_ROOT/bin exists
-            export PATH="$PYENV_ROOT/bin:$PATH"
-        fi
-        # Ensure pyenv init is loaded for the correct shell (zsh in this case)
-        if [[ -n "$ZSH_VERSION" ]]; then
-            eval "$(pyenv init - zsh)"
-        elif [[ -n "$BASH_VERSION" ]]; then
-            eval "$(pyenv init - bash)"
-        fi
-    else
-        echo -e "${YELLOW}Warning: pyenv command not found. PYENV setup skipped.${RESET}" >&2
-    fi
-}
 # -----------------------------------------------------------------------------
 mypy() {   # Display Python environment information
     pyenv_version=$(pyenv --version 2>&1)
@@ -42,28 +26,6 @@ mypy() {   # Display Python environment information
         echo -e "${BLUE}No virtual environment is currently activated.${RESET}"
     else
         echo -e "${BLUE}Current virtual environment: $VIRTUAL_ENV${RESET}"
-    fi
-}
-# -----------------------------------------------------------------------------
-venv_init() { # Initialize and activate a Python virtual environment
-    if [ -d "venv" ]; then
-        info "Virtual environment already exists in the current directory."
-        read -p "Do you want to recreate it? (y/n): " confirm
-        if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-            info "Operation canceled."
-            return 1
-        fi
-        rm -rf venv
-        info "Existing virtual environment removed."
-    fi
-    python -m venv venv
-    if [ $? -eq 0 ]; then
-        info "Virtual environment created successfully."
-        source venv/bin/activate
-        info "Virtual environment activated."
-    else
-        err "Failed to create virtual environment."
-        return 1
     fi
 }
 # -----------------------------------------------------------------------------
@@ -149,9 +111,4 @@ brew_clean_cache() { # Clear Homebrew cache
 # -----------------------------------------------------------------------------
 alias clean-pycache='find . -type d -name "__pycache__" -exec rm -rf {} +'
 alias clean-pip-cache='pip cache purge'
-alias venv-activate='source venv/bin/activate'
-alias venv-deactivate='deactivate'
-alias venv-init='venv_init'
-alias venv-recreate='venv_init'
-alias venv-remove='rm -rf venv && echo "Virtual environment removed."'
 # -----------------------------------------------------------------------------

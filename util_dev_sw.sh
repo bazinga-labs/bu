@@ -12,17 +12,11 @@ check_work_var() {
   local has_analysis=0
   
   if [ -n "$WORK" ] && [ -d "$WORK" ]; then
-    info "WORK: $WORK"
     has_work=1
-  elif [ -n "$WORK" ]; then
-    warn "WORK is set but directory does not exist: $WORK"
   fi
   
   if [ -n "$ANALYSIS" ] && [ -d "$ANALYSIS" ]; then
-    info "ANALYSIS: $ANALYSIS"
     has_analysis=1
-  elif [ -n "$ANALYSIS" ]; then
-    warn "ANALYSIS is set but directory does not exist: $ANALYSIS"
   fi
   
   if [ $has_work -eq 0 ] && [ $has_analysis -eq 0 ]; then
@@ -32,7 +26,6 @@ check_work_var() {
     info "  export ANALYSIS=/path/to/analysis-projects"
     return 1
   fi
-  
   return 0
 }
 
@@ -131,10 +124,6 @@ go_project() { # Navigate to a project directory and set up its environment
   cd "$PROJECT_WORKSPACE" || err "Failed to change directory to $PROJECT_WORKSPACE"
 
 
-  # Load the project environment
-  [ -f "${project_name}.env" ] && source "${project_name}.env"
-  [ -f venv/bin/activate ] && source venv/bin/activate
-  [ -n "$VIRTUAL_ENV" ] && bu_load dev_py || warn "no python env set"
   # Check if workspace file exists, create if it doesn't
   if [ ! -f "${project_name}.code-workspace" ]; then
     info "No workspace file found, generating one"
@@ -215,8 +204,9 @@ open_dev_env() {
 
 # Create alias for open_dev_env
 alias dev="open_dev_env"
+alias gen-py-wrapper='./generate_py_wrapper.sh'
 # -----------------------------------------------------------------------------
-# Adding functions to autogenerate aliases
+# Define aliases for convenience
 check_work_var || { err "Some functions may not work properly without WORK being set"; return 1; }
 gen_project_aliases
 # -----------------------------------------------------------------------------

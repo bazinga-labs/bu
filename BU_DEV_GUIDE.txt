@@ -23,6 +23,7 @@ Structure of a BASH utility file:
 2. The first line must verify that util_bash.sh is loaded
 3. Each function should follow the format: function_name() { # Description
 4. Utilize err, warn, and info functions for standardized output formatting
+5. If the file DOES NOT start with util_<utility name> then allow it to be an executable bash script 
 
 Example template for a new utility file:
 
@@ -36,6 +37,7 @@ if ! type info &>/dev/null; then
   return 1 2>/dev/null || exit 1
 fi
 # Ensure this file is sourced, not executed directly
+# If the file DOES NOT start with util_<utility name> then allow it to be an executable bash script 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   echo "ERROR: This script should be sourced, not executed."
   echo "Usage: source ${BASH_SOURCE[0]}"
