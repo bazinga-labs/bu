@@ -188,8 +188,7 @@ list_project_aliases() { # List all available project aliases
   return 0
 }
 # -----------------------------------------------------------------------------
-open_dev_env() {
-  # Find a .code-workspace file in the current directory
+open_dev_env() { # Find a .code-workspace file in the current directory
   local ws_file
   ws_file=$(ls *.code-workspace 2>/dev/null | head -n 1)
   if [ -n "$ws_file" ]; then

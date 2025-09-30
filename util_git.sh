@@ -291,7 +291,80 @@ util_git_add_submodule() { # Add a git submodule with specific naming convention
     info "Submodule added and updated successfully."
 }
 # Convenience aliases: expose user-friendly comma
+util_git_get_branches() {
+    # Usage: util_git_get_branches [-r] [searchterm]
+    local recursive=0
+    local searchterm=""
+    if [[ "$1" == "-r" ]]; then
+        recursive=1
+        shift
+    fi
+    searchterm="$1"
+
+    # ANSI colors
+    local YELLOW="\033[33m"
+    local GREEN="\033[32m"
+    local RESET="\033[0m"
+
+    # Helper to print branches for a given repo path
+    _print_branches() {
+        local repo_path="$1"
+        (
+            cd "$repo_path" || return
+            local repo_disp
+            repo_disp=$(basename "$(pwd)")
+            # Get current branch
+            local current_branch
+            current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+            # Local branches
+            git branch --list | sed 's/^..//' | while read -r branch; do
+                if [[ -z "$searchterm" || "$branch" == *"$searchterm"* ]]; then
+                    if [[ "$branch" == "$current_branch" ]]; then
+                        # Current branch: default color
+                        echo "$branch : local"
+                    else
+                        # Other local branches: yellow
+                        echo -e "${YELLOW}$branch${RESET} : local"
+                    fi
+                fi
+            done
+            # Remote branches (filter out symbolic refs like origin/HEAD -> origin/main)
+            git branch -r | sed 's/^..//' | while read -r branch; do
+                # Skip symbolic refs
+                if [[ "$branch" == *'->'* ]]; then
+                    continue
+                fi
+                if [[ -z "$searchterm" || "$branch" == *"$searchterm"* ]]; then
+                    # Remote branches: green
+                    echo -e "${GREEN}$branch${RESET} : remote"
+                fi
+            done
+        )
+    }
+
+    # Print for main repo
+    _print_branches "."
+
+    # If recursive, print for each submodule
+    if [[ $recursive -eq 1 ]]; then
+        # For each submodule, get path and url from .gitmodules
+        git config --file .gitmodules --get-regexp '^submodule\..*\.path$' | while read -r pathline; do
+            local sm_dir sm_url
+            sm_dir=$(echo "$pathline" | awk '{print $2}')
+            # Get the submodule name from the config key
+            local sm_name
+            sm_name=$(echo "$pathline" | sed -E 's/^submodule\.([^.]*)\.path.*/\1/')
+            # Get the url for this submodule
+            sm_url=$(git config --file .gitmodules --get submodule."$sm_name".url)
+            if [[ -n "$sm_dir" && -d "$sm_dir" ]]; then
+                info "git submodule $sm_dir $sm_url"
+                _print_branches "$sm_dir"
+            fi
+        done
+    fi
+}
 alias git-add-submodule='util_git_add_submodule' # Add a git submodule with specific naming convention and update it
 alias git-update='util_git_update'  # Update main repo and/or submodules
 alias git-set-branch='util_git_set_branch' # Create/set feature/bug branch in main and submodules
+alias git-get-branches='util_git_get_branches' # Create/set feature/bug branch in main and submodules
 alias git-checkin='util_git_checkin' # Commit changes to main repo and all submodules
