@@ -1,3 +1,4 @@
+
 # -----------------------------------------------------------------------------
 # File: bu/util_git.sh
 # Author: Bazinga Labs LLC
@@ -363,8 +364,135 @@ util_git_get_branches() {
         done
     fi
 }
+# -----------------------------------------------------------------------------
+util_git_install_precommit_hook() { # Install pre-commit hook to block files over specified size
+    local usage="Usage: git_install_precommit_hook [repo-dir] [--maxmb=SIZE]"
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        info "$usage"
+        info "  repo-dir: Target repository (default: current directory)"
+        info "  --maxmb: Maximum file size in MB (default: 100)"
+        info "  Requires 'pre-commit' to be installed (pip install pre-commit)"
+        return 0
+    fi
+
+    local REPO_DIR="."
+    local MAX_MB=100
+
+    # Parse arguments
+    for arg in "$@"; do
+        if [[ "$arg" == --maxmb=* ]]; then
+            MAX_MB="${arg#*=}"
+        elif [[ -d "$arg" ]]; then
+            REPO_DIR="$arg"
+        fi
+    done
+
+    # Validate repo
+    if [[ ! -d "$REPO_DIR/.git" ]]; then
+        err "Directory $REPO_DIR is not a Git repository"
+        return 1
+    fi
+
+    # Check for pre-commit
+    if ! command -v pre-commit &>/dev/null; then
+        err "'pre-commit' not found. Install with: pip install pre-commit"
+        return 1
+    fi
+
+    local MAX_KB=$((MAX_MB * 1024))
+
+    (
+        cd "$REPO_DIR" || { err "Cannot access $REPO_DIR"; return 1; }
+
+        info "Installing pre-commit hook in: $(pwd)"
+        info "Maximum file size: ${MAX_MB}MB (${MAX_KB}KB)"
+
+        # Create hooks directory
+        mkdir -p .pre-commit-hooks
+
+        # Create bash script
+        cat > .pre-commit-hooks/check-large-files.sh <<'EOF_SCRIPT'
+#!/usr/bin/env bash
+# Check for large files being added to git
+# Usage: check-large-files.sh [--maxkb=SIZE] [files...]
+
+set -e
+
+# Default max size: 100MB = 102400KB
+MAX_KB=102400
+
+# Parse arguments
+FILES=()
+for arg in "$@"; do
+    if [[ "$arg" == --maxkb=* ]]; then
+        MAX_KB="${arg#*=}"
+    else
+        FILES+=("$arg")
+    fi
+done
+
+# If no files specified, check all staged files
+if [[ ${#FILES[@]} -eq 0 ]]; then
+    # Get list of added files (A = added, not deleted or renamed)
+    mapfile -t FILES < <(git diff --cached --name-only --diff-filter=A)
+fi
+
+EXIT_CODE=0
+
+# Check each file
+for file in "${FILES[@]}"; do
+    if [[ -f "$file" ]]; then
+        # Get file size in KB
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS
+            FILE_SIZE=$(stat -f %z "$file")
+        else
+            # Linux
+            FILE_SIZE=$(stat -c %s "$file")
+        fi
+
+        # Convert bytes to KB (rounded up)
+        FILE_KB=$(( (FILE_SIZE + 1023) / 1024 ))
+
+        if [[ $FILE_KB -gt $MAX_KB ]]; then
+            echo "$file ($FILE_KB KB) exceeds $MAX_KB KB."
+            EXIT_CODE=1
+        fi
+    fi
+done
+
+exit $EXIT_CODE
+EOF_SCRIPT
+
+        chmod +x .pre-commit-hooks/check-large-files.sh
+
+        # Create config file
+        cat > .pre-commit-config.yaml <<EOF_CONFIG
+repos:
+  - repo: local
+    hooks:
+      - id: check-added-large-files
+        name: Check for files larger than ${MAX_MB}MB
+        entry: .pre-commit-hooks/check-large-files.sh
+        language: system
+        args: ['--maxkb=${MAX_KB}']  # ${MAX_MB}MB = ${MAX_KB}KB
+EOF_CONFIG
+
+        # Install hook
+        if pre-commit install; then
+            info "Pre-commit hook installed successfully!"
+            info "Files: .pre-commit-config.yaml, .pre-commit-hooks/check-large-files.sh"
+        else
+            err "Failed to install pre-commit hook"
+            return 1
+        fi
+    )
+}
+# -----------------------------------------------------------------------------
+alias git-install-precommit-hook='util_git_install_precommit_hook' # Install pre-commit hook to block large files
 alias git-add-submodule='util_git_add_submodule' # Add a git submodule with specific naming convention and update it
 alias git-update='util_git_update'  # Update main repo and/or submodules
 alias git-set-branch='util_git_set_branch' # Create/set feature/bug branch in main and submodules
 alias git-get-branches='util_git_get_branches' # Create/set feature/bug branch in main and submodules
 alias git-checkin='util_git_checkin' # Commit changes to main repo and all submodules
+# -----------------------------------------------------------------------------
